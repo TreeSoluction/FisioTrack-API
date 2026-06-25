@@ -7,9 +7,6 @@ RUN yarn install --frozen-lockfile
 
 COPY . .
 
-ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fisiotrack?schema=public
-ENV DATABASE_URL=$DATABASE_URL
-
 RUN npx prisma generate
 
 RUN yarn build
