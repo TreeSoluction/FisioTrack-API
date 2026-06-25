@@ -24,19 +24,19 @@ export class TratamentosController {
 
   @Post()
   @ApiOperation({ summary: 'Criar tratamento' })
-  create(@Request() req, @Body() createTratamentoDto: CreateTratamentoDto) {
+  create(@Request() req: any, @Body() createTratamentoDto: CreateTratamentoDto) {
     return this.tratamentosService.create(req.user.id, createTratamentoDto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Listar tratamentos' })
-  findAll(@Request() req) {
+  findAll(@Request() req: any) {
     return this.tratamentosService.findAll(req.user.id);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Buscar tratamento por ID' })
-  findOne(@Param('id') id: string, @Request() req) {
+  findOne(@Param('id') id: string, @Request() req: any) {
     return this.tratamentosService.findOne(id, req.user.id);
   }
 
@@ -44,7 +44,7 @@ export class TratamentosController {
   @ApiOperation({ summary: 'Atualizar tratamento' })
   update(
     @Param('id') id: string,
-    @Request() req,
+    @Request() req: any,
     @Body() updateTratamentoDto: UpdateTratamentoDto,
   ) {
     return this.tratamentosService.update(id, req.user.id, updateTratamentoDto);
@@ -52,7 +52,7 @@ export class TratamentosController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Deletar tratamento' })
-  remove(@Param('id') id: string, @Request() req) {
+  remove(@Param('id') id: string, @Request() req: any) {
     return this.tratamentosService.remove(id, req.user.id);
   }
 }

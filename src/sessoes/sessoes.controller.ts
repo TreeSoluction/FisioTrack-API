@@ -24,7 +24,7 @@ export class SessoesController {
   @Post(':tratamentoId')
   @ApiOperation({ summary: 'Criar sessão de acompanhamento' })
   create(
-    @Request() req,
+    @Request() req: any,
     @Param('tratamentoId') tratamentoId: string,
     @Body() createSessaoDto: CreateSessaoDto,
   ) {
@@ -34,7 +34,7 @@ export class SessoesController {
   @Get('tratamento/:tratamentoId')
   @ApiOperation({ summary: 'Listar sessões por tratamento' })
   findAllByTratamento(
-    @Request() req,
+    @Request() req: any,
     @Param('tratamentoId') tratamentoId: string,
   ) {
     return this.sessoesService.findAllByTratamento(req.user.id, tratamentoId);
@@ -42,13 +42,13 @@ export class SessoesController {
 
   @Get('dashboard/:pacienteId')
   @ApiOperation({ summary: 'Dashboard de evolução do paciente' })
-  getDashboard(@Request() req, @Param('pacienteId') pacienteId: string) {
+  getDashboard(@Request() req: any, @Param('pacienteId') pacienteId: string) {
     return this.sessoesService.getDashboard(req.user.id, pacienteId);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Deletar sessão' })
-  remove(@Param('id') id: string, @Request() req) {
+  remove(@Param('id') id: string, @Request() req: any) {
     return this.sessoesService.remove(id, req.user.id);
   }
 }

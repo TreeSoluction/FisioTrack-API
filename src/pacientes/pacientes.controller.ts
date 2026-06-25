@@ -24,19 +24,19 @@ export class PacientesController {
 
   @Post()
   @ApiOperation({ summary: 'Criar paciente' })
-  create(@Request() req, @Body() createPacienteDto: CreatePacienteDto) {
+  create(@Request() req: any, @Body() createPacienteDto: CreatePacienteDto) {
     return this.pacientesService.create(req.user.id, createPacienteDto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Listar pacientes' })
-  findAll(@Request() req) {
+  findAll(@Request() req: any) {
     return this.pacientesService.findAll(req.user.id);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Buscar paciente por ID' })
-  findOne(@Param('id') id: string, @Request() req) {
+  findOne(@Param('id') id: string, @Request() req: any) {
     return this.pacientesService.findOne(id, req.user.id);
   }
 
@@ -44,7 +44,7 @@ export class PacientesController {
   @ApiOperation({ summary: 'Atualizar paciente' })
   update(
     @Param('id') id: string,
-    @Request() req,
+    @Request() req: any,
     @Body() updatePacienteDto: UpdatePacienteDto,
   ) {
     return this.pacientesService.update(id, req.user.id, updatePacienteDto);
@@ -52,7 +52,7 @@ export class PacientesController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Deletar paciente' })
-  remove(@Param('id') id: string, @Request() req) {
+  remove(@Param('id') id: string, @Request() req: any) {
     return this.pacientesService.remove(id, req.user.id);
   }
 }
