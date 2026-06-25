@@ -1,11 +1,10 @@
 #!/bin/sh
 set -e
 
-echo "Running Prisma migrations..."
-npx prisma migrate deploy
+echo "DATABASE_URL: $DATABASE_URL"
 
-echo "Generating Prisma client..."
-npx prisma generate
+echo "Running Prisma migrations..."
+DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy
 
 echo "Starting server..."
 exec node dist/main
