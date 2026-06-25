@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Usuario {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String   @unique
+  senha     String
+  role      Role     @default(FISIOTERAPEUTA)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pacientes      Paciente[]
+  tratamentos    Tratamento[]
+  agendamentos   Agendamento[]
+
+  @@map("usuarios")
+}
+
+model Paciente {
+  id             String   @id @default(cuid())
+  nome           String
+  cpf            String   @unique
+  dataNascimento DateTime
+  telefone       String
+  email          String?
+  endereco       String?
+  historico      String?
+  status         StatusPaciente @default(ATIVO)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  usuarioId String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  tratamentos Tratamento[]
+  agendamentos Agendamento[]
+
+  @@map("pacientes")
+}
+
+model Tratamento {
+  id             String   @id @default(cuid())
+  tempoEstimado  String
+  exercicios     String
+  valor          Decimal
+  status         StatusTratamento @default(EM_ANDAMENTO)
+  dataInicio     DateTime @default(now())
+  dataFim        DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  pacienteId String
+  paciente   Paciente @relation(fields: [pacienteId], references: [id])
+
+  usuarioId String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  sessoes    Sessao[]
+  pagamentos Pagamento[]
+
+  @@map("tratamentos")
+}
+
+model Sessao {
+  id          String   @id @default(cuid())
+  data        DateTime @default(now())
+  peso        Decimal?
+  escalaDor   Int
+  medidas     Json?
+  observacoes String?
+  createdAt   DateTime @default(now())
+
+  tratamentoId String
+  tratamento   Tratamento @relation(fields: [tratamentoId], references: [id])
+
+  @@map("sessoes")
+}
+
+model Agendamento {
+  id        String   @id @default(cuid())
+  dataHora  DateTime
+  status    StatusAgendamento @default(PENDENTE)
+  lembreteEnviado Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pacienteId String
+  paciente   Paciente @relation(fields: [pacienteId], references: [id])
+
+  usuarioId String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@map("agendamentos")
+}
+
+model Pagamento {
+  id            String   @id @default(cuid())
+  valor         Decimal
+  dataVencimento DateTime
+  dataPagamento DateTime?
+  status        StatusPagamento @default(PENDENTE)
+  comprovante   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tratamentoId String
+  tratamento   Tratamento @relation(fields: [tratamentoId], references: [id])
+
+  @@map("pagamentos")
+}
+
+enum Role {
+  ADMIN
+  FISIOTERAPEUTA
+}
+
+enum StatusPaciente {
+  ATIVO
+  INATIVO
+}
+
+enum StatusTratamento {
+  EM_ANDAMENTO
+  PAUSADO
+  CONCLUIDO
+}
+
+enum StatusAgendamento {
+  PENDENTE
+  CONFIRMADO
+  CANCELADO
+  CONCLUIDO
+}
+
+enum StatusPagamento {
+  PENDENTE
+  PAGO
+  ATRASADO
+}
