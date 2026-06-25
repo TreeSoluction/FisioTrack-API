@@ -11,14 +11,14 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
-    const user = await this.prisma.usuario.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
-      throw new UnauthorizedException('Credenciais inválidas');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    const passwordValid = await bcrypt.compare(password, user.senha);
+    const passwordValid = await bcrypt.compare(password, user.password);
     if (!passwordValid) {
-      throw new UnauthorizedException('Credenciais inválidas');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     const payload = { sub: user.id, email: user.email, role: user.role };
@@ -26,23 +26,24 @@ export class AuthService {
       access_token: this.jwtService.sign(payload),
       user: {
         id: user.id,
-        nome: user.nome,
+        name: user.name,
         email: user.email,
         role: user.role,
       },
     };
   }
 
-  async register(data: { nome: string; email: string; senha: string }) {
-    const hashedPassword = await bcrypt.hash(data.senha, 10);
-    return this.prisma.usuario.create({
+  async register(name: string, email: string, password: string) {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    return this.prisma.user.create({
       data: {
-        ...data,
-        senha: hashedPassword,
+        name,
+        email,
+        password: hashedPassword,
       },
       select: {
         id: true,
-        nome: true,
+        name: true,
         email: true,
         role: true,
       },

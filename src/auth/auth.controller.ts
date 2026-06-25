@@ -9,14 +9,16 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login do usuário' })
-  async login(@Body() body: { email: string; senha: string }) {
-    return this.authService.login(body.email, body.senha);
+  @ApiOperation({ summary: 'Login' })
+  async login(@Body() body: { email: string; password: string }) {
+    return this.authService.login(body.email, body.password);
   }
 
   @Post('register')
-  @ApiOperation({ summary: 'Registrar novo usuário' })
-  async register(@Body() body: { nome: string; email: string; senha: string }) {
-    return this.authService.register(body);
+  @ApiOperation({ summary: 'Register new user' })
+  async register(
+    @Body() body: { name: string; email: string; password: string },
+  ) {
+    return this.authService.register(body.name, body.email, body.password);
   }
 }

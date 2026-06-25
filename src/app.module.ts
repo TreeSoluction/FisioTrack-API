@@ -2,18 +2,20 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
-import { PacientesModule } from './pacientes/pacientes.module';
-import { TratamentosModule } from './tratamentos/tratamentos.module';
-import { SessoesModule } from './sessoes/sessoes.module';
+import { PatientsModule } from './patients/patients.module';
+import { TreatmentsModule } from './treatments/treatments.module';
+import { SessionsModule } from './sessions/sessions.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuthModule,
-    PacientesModule,
-    TratamentosModule,
-    SessoesModule,
+    PatientsModule,
+    TreatmentsModule,
+    SessionsModule,
+    EmailModule,
   ],
 })
 export class AppModule {}

@@ -11,15 +11,17 @@ async function bootstrap() {
     credentials: true,
   });
 
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   const config = new DocumentBuilder()
     .setTitle('FisioTrack API')
-    .setDescription('API para gestão de fisioterapia')
+    .setDescription('API for physiotherapy management')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
