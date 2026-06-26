@@ -66,8 +66,6 @@ export class AuthService {
       },
     });
 
-    await this.consentService.recordAllConsents(user.id);
-
     return user;
   }
 }

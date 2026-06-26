@@ -9,6 +9,7 @@ import { EmailModule } from './email/email.module';
 import { ConsentModule } from './consent/consent.module';
 import { PlansModule } from './plans/plans.module';
 import { EnterpriseModule } from './enterprise/enterprise.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { EnterpriseModule } from './enterprise/enterprise.module';
     ConsentModule,
     PlansModule,
     EnterpriseModule,
+    UsersModule,
   ],
 })
 export class AppModule {}
