@@ -2,12 +2,14 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConsentService } from '../consent/consent.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private consentService: ConsentService,
   ) {}
 
   async login(email: string, password: string) {
@@ -21,6 +23,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    const consentStatus = await this.consentService.getConsentStatus(user.id);
+
     const payload = { sub: user.id, email: user.email, role: user.role };
     return {
       access_token: this.jwtService.sign(payload),
@@ -30,12 +34,14 @@ export class AuthService {
         email: user.email,
         role: user.role,
       },
+      requiresConsent: !consentStatus.hasConsented,
+      missingDocuments: consentStatus.missingDocuments,
     };
   }
 
   async register(name: string, email: string, password: string) {
     const hashedPassword = await bcrypt.hash(password, 10);
-    return this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data: {
         name,
         email,
@@ -48,5 +54,9 @@ export class AuthService {
         role: true,
       },
     });
+
+    await this.consentService.recordAllConsents(user.id);
+
+    return user;
   }
 }

@@ -19,6 +19,7 @@ model User {
   patients    Patient[]
   treatments  Treatment[]
   appointments Appointment[]
+  consents    UserConsent[]
 
   @@map("users")
 }
@@ -143,4 +144,23 @@ enum PaymentStatus {
   PENDING
   PAID
   OVERDUE
+}
+
+enum DocumentType {
+  PRIVACY_POLICY
+  TERMS_OF_USE
+  CONSENT_TERMS
+}
+
+model UserConsent {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  documentType    DocumentType
+  documentVersion String
+  consentedAt     DateTime @default(now())
+  ipAddress       String?
+
+  @@unique([userId, documentType])
+  @@map("user_consents")
 }
