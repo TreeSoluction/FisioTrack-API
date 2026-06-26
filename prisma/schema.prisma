@@ -27,6 +27,7 @@ model User {
   appointments Appointment[]
   consents    UserConsent[]
   enterpriseRequest EnterpriseRequest?
+  review      Review?
 
   @@map("users")
 }
@@ -205,4 +206,16 @@ model EnterpriseRequest {
   updatedAt       DateTime @updatedAt
 
   @@map("enterprise_requests")
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  rating      Int
+  comment     String?
+  dismissedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@map("reviews")
 }
