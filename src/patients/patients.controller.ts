@@ -12,6 +12,7 @@ import {
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ConsentGuard } from '../consent/consent.guard';
+import { PatientLimitGuard } from '../common/patient-limit.guard';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
@@ -24,6 +25,7 @@ export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
   @Post()
+  @UseGuards(PatientLimitGuard)
   create(@Req() req: any, @Body() createPatientDto: CreatePatientDto) {
     return this.patientsService.create(req.user.id, createPatientDto);
   }

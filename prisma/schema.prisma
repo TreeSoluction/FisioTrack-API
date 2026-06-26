@@ -13,6 +13,12 @@ model User {
   email     String   @unique
   password  String
   role      Role     @default(THERAPIST)
+  plan      PlanType @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(ACTIVE)
+  subscriptionStartDate DateTime?
+  subscriptionEndDate   DateTime?
+  stripeCustomerId      String?
+  maxPatients           Int      @default(50)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -20,6 +26,7 @@ model User {
   treatments  Treatment[]
   appointments Appointment[]
   consents    UserConsent[]
+  enterpriseRequest EnterpriseRequest?
 
   @@map("users")
 }
@@ -163,4 +170,39 @@ model UserConsent {
 
   @@unique([userId, documentType])
   @@map("user_consents")
+}
+
+enum PlanType {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PENDING
+  CANCELLED
+  EXPIRED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model EnterpriseRequest {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  companyName     String
+  cnpj            String?
+  teamSize        Int
+  phone           String
+  message         String?
+  status          RequestStatus @default(PENDING)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("enterprise_requests")
 }

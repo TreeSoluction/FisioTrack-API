@@ -7,6 +7,8 @@ import { TreatmentsModule } from './treatments/treatments.module';
 import { SessionsModule } from './sessions/sessions.module';
 import { EmailModule } from './email/email.module';
 import { ConsentModule } from './consent/consent.module';
+import { PlansModule } from './plans/plans.module';
+import { EnterpriseModule } from './enterprise/enterprise.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { ConsentModule } from './consent/consent.module';
     SessionsModule,
     EmailModule,
     ConsentModule,
+    PlansModule,
+    EnterpriseModule,
   ],
 })
 export class AppModule {}
