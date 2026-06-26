@@ -5,7 +5,6 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { PlanType } from '@prisma/client';
 
 @Injectable()
 export class PatientLimitGuard implements CanActivate {
@@ -19,14 +18,21 @@ export class PatientLimitGuard implements CanActivate {
       return true;
     }
 
-    const userData = await this.prisma.user.findUnique({
-      where: { id: user.id },
-      select: { plan: true, maxPatients: true },
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId: user.id },
+      select: { plan: true },
     });
 
-    if (userData.plan === PlanType.PRO || userData.plan === PlanType.ENTERPRISE) {
+    const plan = subscription?.plan || 'FREE';
+
+    if (plan === 'PRO' || plan === 'ENTERPRISE') {
       return true;
     }
+
+    const userData = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { maxPatients: true },
+    });
 
     const patientCount = await this.prisma.patient.count({
       where: { userId: user.id },
@@ -37,7 +43,7 @@ export class PatientLimitGuard implements CanActivate {
         message: 'Patient limit reached',
         current: patientCount,
         max: userData.maxPatients,
-        plan: userData.plan,
+        plan,
         upgradeRequired: true,
       });
     }

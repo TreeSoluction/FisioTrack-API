@@ -3,7 +3,6 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConsentService } from '../consent/consent.service';
-import { PlanType } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -14,7 +13,10 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { subscription: true },
+    });
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -25,12 +27,13 @@ export class AuthService {
     }
 
     const consentStatus = await this.consentService.getConsentStatus(user.id);
+    const plan = user.subscription?.plan || 'FREE';
 
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
-      plan: user.plan,
+      plan,
     };
     return {
       access_token: this.jwtService.sign(payload),
@@ -39,7 +42,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
-        plan: user.plan,
+        plan,
         maxPatients: user.maxPatients,
       },
       requiresConsent: !consentStatus.hasConsented,
@@ -54,7 +57,6 @@ export class AuthService {
         name,
         email,
         password: hashedPassword,
-        plan: PlanType.FREE,
         maxPatients: 50,
       },
       select: {
@@ -62,7 +64,15 @@ export class AuthService {
         name: true,
         email: true,
         role: true,
-        plan: true,
+      },
+    });
+
+    // Create default FREE subscription
+    await this.prisma.subscription.create({
+      data: {
+        userId: user.id,
+        plan: 'FREE',
+        status: 'ACTIVE',
       },
     });
 

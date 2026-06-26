@@ -13,12 +13,7 @@ model User {
   email     String   @unique
   password  String
   role      Role     @default(THERAPIST)
-  plan      PlanType @default(FREE)
-  subscriptionStatus SubscriptionStatus @default(ACTIVE)
-  subscriptionStartDate DateTime?
-  subscriptionEndDate   DateTime?
-  stripeCustomerId      String?
-  maxPatients           Int      @default(50)
+  maxPatients Int    @default(50)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -28,6 +23,7 @@ model User {
   consents    UserConsent[]
   enterpriseRequest EnterpriseRequest?
   review      Review?
+  subscription Subscription?
 
   @@map("users")
 }
@@ -181,9 +177,9 @@ enum PlanType {
 
 enum SubscriptionStatus {
   ACTIVE
-  PENDING
+  PAST_DUE
   CANCELLED
-  EXPIRED
+  UNPAID
 }
 
 enum RequestStatus {
@@ -218,4 +214,32 @@ model Review {
   createdAt   DateTime @default(now())
 
   @@map("reviews")
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  user                 User               @relation(fields: [userId], references: [id])
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  plan                 PlanType           @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@map("subscriptions")
+}
+
+model WebhookEvent {
+  id             String   @id @default(cuid())
+  stripeEventId  String   @unique
+  type           String
+  processed      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@map("webhook_events")
 }

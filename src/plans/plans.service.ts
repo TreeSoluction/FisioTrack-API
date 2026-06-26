@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { PlanType } from '@prisma/client';
 
 export interface PlanFeature {
   name: string;
@@ -8,7 +7,7 @@ export interface PlanFeature {
 }
 
 export interface Plan {
-  id: PlanType;
+  id: string;
   name: string;
   price: string;
   period: string;
@@ -25,7 +24,7 @@ export class PlansService {
   getAvailablePlans(): Plan[] {
     return [
       {
-        id: PlanType.FREE,
+        id: 'FREE',
         name: 'Gratuito',
         price: 'R$ 0',
         period: '/mês',
@@ -39,7 +38,7 @@ export class PlansService {
         maxPatients: 50,
       },
       {
-        id: PlanType.PRO,
+        id: 'PRO',
         name: 'PRO',
         price: 'R$ 19,90',
         period: '/mês',
@@ -55,7 +54,7 @@ export class PlansService {
         popular: true,
       },
       {
-        id: PlanType.ENTERPRISE,
+        id: 'ENTERPRISE',
         name: 'Enterprise',
         price: 'Custom',
         period: '',
@@ -73,13 +72,19 @@ export class PlansService {
   }
 
   async getCurrentPlan(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { plan: true, maxPatients: true, subscriptionStatus: true },
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+      select: { plan: true, status: true },
     });
 
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { maxPatients: true },
+    });
+
+    const plan = subscription?.plan || 'FREE';
     const plans = this.getAvailablePlans();
-    const currentPlan = plans.find((p) => p.id === user.plan);
+    const currentPlan = plans.find((p) => p.id === plan);
 
     const patientCount = await this.prisma.patient.count({
       where: { userId },
@@ -87,21 +92,28 @@ export class PlansService {
 
     return {
       ...currentPlan,
-      subscriptionStatus: user.subscriptionStatus,
+      subscriptionStatus: subscription?.status || 'ACTIVE',
       patientCount,
       maxPatients: user.maxPatients,
     };
   }
 
   async canCreatePatient(userId: string): Promise<{ allowed: boolean; current: number; max: number | null }> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { plan: true, maxPatients: true },
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+      select: { plan: true },
     });
 
-    if (user.plan === PlanType.PRO || user.plan === PlanType.ENTERPRISE) {
+    const plan = subscription?.plan || 'FREE';
+
+    if (plan === 'PRO' || plan === 'ENTERPRISE') {
       return { allowed: true, current: 0, max: null };
     }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { maxPatients: true },
+    });
 
     const patientCount = await this.prisma.patient.count({
       where: { userId },

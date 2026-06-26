@@ -14,10 +14,16 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
-        plan: true,
-        subscriptionStatus: true,
         maxPatients: true,
         createdAt: true,
+        subscription: {
+          select: {
+            plan: true,
+            status: true,
+            currentPeriodEnd: true,
+            cancelAtPeriodEnd: true,
+          },
+        },
       },
     });
 
@@ -25,7 +31,11 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    return {
+      ...user,
+      plan: user.subscription?.plan || 'FREE',
+      subscriptionStatus: user.subscription?.status || 'ACTIVE',
+    };
   }
 
   async updateProfile(userId: string, dto: UpdateUserDto) {
@@ -45,7 +55,6 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
-        plan: true,
       },
     });
   }
@@ -58,7 +67,6 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
-        plan: true,
         createdAt: true,
         patients: true,
         treatments: {
@@ -69,6 +77,7 @@ export class UsersService {
         },
         appointments: true,
         consents: true,
+        subscription: true,
       },
     });
 
@@ -83,9 +92,9 @@ export class UsersService {
         name: user.name,
         email: user.email,
         role: user.role,
-        plan: user.plan,
         createdAt: user.createdAt,
       },
+      subscription: user.subscription,
       patients: user.patients,
       treatments: user.treatments,
       appointments: user.appointments,
@@ -128,6 +137,14 @@ export class UsersService {
     });
 
     await this.prisma.enterpriseRequest.deleteMany({
+      where: { userId },
+    });
+
+    await this.prisma.review.deleteMany({
+      where: { userId },
+    });
+
+    await this.prisma.subscription.deleteMany({
       where: { userId },
     });
 
