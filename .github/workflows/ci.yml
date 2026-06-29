@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: soluctiontree/soluctiontree:backend
+  IMAGE_NAME: soluctiontree/soluctiontree:fisiotrack-backend
 
 jobs:
   test:
