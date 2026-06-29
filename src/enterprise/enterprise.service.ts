@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEnterpriseRequestDto } from './dto/enterprise-request.dto';
 
@@ -23,6 +27,7 @@ export class EnterpriseService {
         teamSize: dto.teamSize,
         phone: dto.phone,
         message: dto.message,
+        status: 'PENDING',
       },
     });
   }

@@ -7,7 +7,9 @@ const TAG_LENGTH = 16;
 function getKey(): Buffer {
   const keyHex = process.env.ENCRYPTION_KEY;
   if (!keyHex || keyHex.length < 64) {
-    throw new Error('ENCRYPTION_KEY env var must be a 32-byte hex string (64 chars)');
+    throw new Error(
+      'ENCRYPTION_KEY env var must be a 32-byte hex string (64 chars)',
+    );
   }
   return Buffer.from(keyHex, 'hex');
 }

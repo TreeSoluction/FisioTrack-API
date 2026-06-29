@@ -37,7 +37,7 @@ export class ConsentService {
 
   async getConsentStatus(userId: string) {
     const consents = await this.prisma.userConsent.findMany({
-      where: { userId },
+      where: { userId, revokedAt: null },
     });
 
     const consentMap = new Map(
@@ -91,6 +91,25 @@ export class ConsentService {
     return this.prisma.userConsent.findMany({
       where: { userId },
       orderBy: { consentedAt: 'desc' },
+    });
+  }
+
+  async revokeConsent(userId: string, documentType: DocumentType) {
+    const consent = await this.prisma.userConsent.findUnique({
+      where: {
+        userId_documentType: { userId, documentType },
+      },
+    });
+
+    if (!consent || consent.revokedAt) {
+      return null;
+    }
+
+    return this.prisma.userConsent.update({
+      where: {
+        userId_documentType: { userId, documentType },
+      },
+      data: { revokedAt: new Date() },
     });
   }
 }

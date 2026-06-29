@@ -13,7 +13,10 @@ export class EnterpriseController {
 
   @Post('request')
   @ApiOperation({ summary: 'Submit enterprise plan request' })
-  async createRequest(@Req() req: any, @Body() dto: CreateEnterpriseRequestDto) {
+  async createRequest(
+    @Req() req: any,
+    @Body() dto: CreateEnterpriseRequestDto,
+  ) {
     return this.enterpriseService.createRequest(req.user.id, dto);
   }
 

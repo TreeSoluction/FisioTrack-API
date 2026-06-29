@@ -1,4 +1,8 @@
-import { Injectable, ForbiddenException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 
@@ -18,15 +22,15 @@ export class ReviewsService {
     });
 
     const accountAgeDays = Math.floor(
-      (Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+      (Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24),
     );
 
     const hasReviewed = !!review;
-    const wasDismissed = review?.dismissedAt !== null;
+    const wasDismissed = review?.dismissedAt != null;
     const daysSinceDismiss = wasDismissed
       ? Math.floor(
-          (Date.now() - new Date(review.dismissedAt!).getTime()) /
-            (1000 * 60 * 60 * 24)
+          (Date.now() - new Date(review.dismissedAt).getTime()) /
+            (1000 * 60 * 60 * 24),
         )
       : 0;
 

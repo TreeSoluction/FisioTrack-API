@@ -50,7 +50,12 @@ export class AuthService {
     };
   }
 
-  async register(name: string, email: string, password: string) {
+  async register(
+    name: string,
+    email: string,
+    password: string,
+    ipAddress?: string,
+  ) {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await this.prisma.user.create({
       data: {
@@ -67,7 +72,6 @@ export class AuthService {
       },
     });
 
-    // Create default FREE subscription
     await this.prisma.subscription.create({
       data: {
         userId: user.id,
@@ -75,6 +79,8 @@ export class AuthService {
         status: 'ACTIVE',
       },
     });
+
+    await this.consentService.recordAllConsents(user.id, ipAddress);
 
     return user;
   }

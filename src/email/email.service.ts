@@ -29,7 +29,11 @@ export class EmailService {
     });
   }
 
-  async sendSessionSummary(to: string, patientName: string, data: { painScale: number; weight?: number; notes?: string }) {
+  async sendSessionSummary(
+    to: string,
+    patientName: string,
+    data: { painScale: number; weight?: number; notes?: string },
+  ) {
     await this.mailer.sendMail({
       to,
       subject: `Session Summary - ${patientName} - FisioTrack`,

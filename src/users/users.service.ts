@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { decryptPatientFields } from '../common/encryption.util';
+
+const SENSITIVE_FIELDS = ['cpf', 'medicalHistory', 'address', 'phone', 'email'];
 
 @Injectable()
 export class UsersService {
@@ -95,7 +98,9 @@ export class UsersService {
         createdAt: user.createdAt,
       },
       subscription: user.subscription,
-      patients: user.patients,
+      patients: user.patients.map((p) =>
+        decryptPatientFields(p, SENSITIVE_FIELDS),
+      ),
       treatments: user.treatments,
       appointments: user.appointments,
       consents: user.consents,
@@ -111,46 +116,38 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    // Delete all related data in order
-    await this.prisma.session.deleteMany({
-      where: { treatment: { userId } },
-    });
-
-    await this.prisma.payment.deleteMany({
-      where: { treatment: { userId } },
-    });
-
-    await this.prisma.treatment.deleteMany({
-      where: { userId },
-    });
-
-    await this.prisma.appointment.deleteMany({
-      where: { userId },
-    });
-
-    await this.prisma.patient.deleteMany({
-      where: { userId },
-    });
-
-    await this.prisma.userConsent.deleteMany({
-      where: { userId },
-    });
-
-    await this.prisma.enterpriseRequest.deleteMany({
-      where: { userId },
-    });
-
-    await this.prisma.review.deleteMany({
-      where: { userId },
-    });
-
-    await this.prisma.subscription.deleteMany({
-      where: { userId },
-    });
-
-    await this.prisma.user.delete({
-      where: { id: userId },
-    });
+    await this.prisma.$transaction([
+      this.prisma.session.deleteMany({
+        where: { treatment: { userId } },
+      }),
+      this.prisma.payment.deleteMany({
+        where: { treatment: { userId } },
+      }),
+      this.prisma.treatment.deleteMany({
+        where: { userId },
+      }),
+      this.prisma.appointment.deleteMany({
+        where: { userId },
+      }),
+      this.prisma.patient.deleteMany({
+        where: { userId },
+      }),
+      this.prisma.userConsent.deleteMany({
+        where: { userId },
+      }),
+      this.prisma.enterpriseRequest.deleteMany({
+        where: { userId },
+      }),
+      this.prisma.review.deleteMany({
+        where: { userId },
+      }),
+      this.prisma.subscription.deleteMany({
+        where: { userId },
+      }),
+      this.prisma.user.delete({
+        where: { id: userId },
+      }),
+    ]);
 
     return { message: 'Account deleted successfully' };
   }

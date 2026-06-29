@@ -98,7 +98,9 @@ export class PlansService {
     };
   }
 
-  async canCreatePatient(userId: string): Promise<{ allowed: boolean; current: number; max: number | null }> {
+  async canCreatePatient(
+    userId: string,
+  ): Promise<{ allowed: boolean; current: number; max: number | null }> {
     const subscription = await this.prisma.subscription.findUnique({
       where: { userId },
       select: { plan: true },
@@ -106,17 +108,17 @@ export class PlansService {
 
     const plan = subscription?.plan || 'FREE';
 
+    const patientCount = await this.prisma.patient.count({
+      where: { userId },
+    });
+
     if (plan === 'PRO' || plan === 'ENTERPRISE') {
-      return { allowed: true, current: 0, max: null };
+      return { allowed: true, current: patientCount, max: null };
     }
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { maxPatients: true },
-    });
-
-    const patientCount = await this.prisma.patient.count({
-      where: { userId },
     });
 
     return {

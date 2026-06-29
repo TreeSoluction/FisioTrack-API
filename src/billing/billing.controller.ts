@@ -15,6 +15,7 @@ import { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BillingService } from './billing.service';
+import { CreateCheckoutDto } from './dto/create-checkout.dto';
 
 @ApiTags('billing')
 @Controller('billing')
@@ -27,17 +28,11 @@ export class BillingController {
     return this.billingService.getProductWithPrices();
   }
 
-  @Get('plans')
-  @ApiOperation({ summary: 'Get available plans' })
-  async getPlans() {
-    return this.billingService.getProductWithPrices();
-  }
-
   @Post('checkout')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Create Stripe Checkout Session' })
-  async createCheckout(@Req() req: any, @Body() body: { interval: 'month' | 'year' }) {
+  async createCheckout(@Req() req: any, @Body() body: CreateCheckoutDto) {
     return this.billingService.createCheckoutSession(
       req.user.id,
       req.user.email,
@@ -86,19 +81,12 @@ export class BillingController {
     @Req() req: RawBodyRequest<Request>,
     @Res() res: Response,
   ) {
-    const sig = req.headers['stripe-signature'];
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    if (!sig || !secret) {
-      res.status(400).json({ error: 'Missing signature or secret' });
-      return;
-    }
+    const sig = req.headers['stripe-signature'] as string | undefined;
 
     let event: Stripe.Event;
 
     try {
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
-      event = stripe.webhooks.constructEvent(req.rawBody, sig, secret);
+      event = this.billingService.verifyWebhookSignature(req.rawBody, sig);
     } catch (err: any) {
       console.error('Webhook signature verification failed:', err.message);
       res.status(400).json({ error: `Webhook Error: ${err.message}` });

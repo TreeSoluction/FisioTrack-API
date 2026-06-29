@@ -163,6 +163,7 @@ model UserConsent {
   documentType    DocumentType
   documentVersion String
   consentedAt     DateTime @default(now())
+  revokedAt       DateTime?
   ipAddress       String?
 
   @@unique([userId, documentType])

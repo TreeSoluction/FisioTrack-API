@@ -7,7 +7,7 @@ import {
   decryptPatientFields,
 } from '../common/encryption.util';
 
-const SENSITIVE_FIELDS = ['cpf', 'medicalHistory', 'address'];
+const SENSITIVE_FIELDS = ['cpf', 'medicalHistory', 'address', 'phone', 'email'];
 
 @Injectable()
 export class PatientsService {
@@ -15,12 +15,13 @@ export class PatientsService {
 
   async create(userId: string, data: CreatePatientDto) {
     const encryptedData = encryptPatientFields(data, SENSITIVE_FIELDS);
-    return this.prisma.patient.create({
+    const patient = await this.prisma.patient.create({
       data: {
         ...encryptedData,
         userId,
       },
     });
+    return decryptPatientFields(patient, SENSITIVE_FIELDS);
   }
 
   async findAll(userId: string) {
@@ -50,10 +51,11 @@ export class PatientsService {
   async update(id: string, userId: string, data: UpdatePatientDto) {
     await this.findOne(id, userId);
     const encryptedData = encryptPatientFields(data, SENSITIVE_FIELDS);
-    return this.prisma.patient.update({
+    const patient = await this.prisma.patient.update({
       where: { id },
       data: encryptedData,
     });
+    return decryptPatientFields(patient, SENSITIVE_FIELDS);
   }
 
   async remove(id: string, userId: string) {
