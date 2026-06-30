@@ -2,7 +2,12 @@ import * as crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
-const TAG_LENGTH = 16;
+
+export function isEncryptionEnabled(): boolean {
+  const value = process.env.ENCRYPTION_ENABLED;
+  if (value === undefined || value === '') return true;
+  return value !== 'false';
+}
 
 function getKey(): Buffer {
   const keyHex = process.env.ENCRYPTION_KEY;
@@ -46,6 +51,8 @@ export function encryptPatientFields<T extends Record<string, any>>(
   data: T,
   fields: string[],
 ): T {
+  if (!isEncryptionEnabled()) return data;
+
   const result = { ...data } as Record<string, any>;
   for (const field of fields) {
     if (result[field] && typeof result[field] === 'string') {
@@ -59,6 +66,8 @@ export function decryptPatientFields<T extends Record<string, any>>(
   data: T,
   fields: string[],
 ): T {
+  if (!isEncryptionEnabled()) return data;
+
   const result = { ...data } as Record<string, any>;
   for (const field of fields) {
     if (result[field] && typeof result[field] === 'string') {
