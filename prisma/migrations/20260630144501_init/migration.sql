@@ -162,8 +162,8 @@ CREATE TABLE "reviews" (
 CREATE TABLE "subscriptions" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "pagarmeCustomerId" TEXT,
-    "pagarmeSubscriptionId" TEXT,
+    "mpCustomerId" TEXT,
+    "mpPreapprovalId" TEXT,
     "plan" "PlanType" NOT NULL DEFAULT 'FREE',
     "status" "SubscriptionStatus" NOT NULL DEFAULT 'ACTIVE',
     "currentPeriodStart" TIMESTAMP(3),
@@ -217,10 +217,10 @@ CREATE UNIQUE INDEX "reviews_userId_key" ON "reviews"("userId");
 CREATE UNIQUE INDEX "subscriptions_userId_key" ON "subscriptions"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "subscriptions_pagarmeCustomerId_key" ON "subscriptions"("pagarmeCustomerId");
+CREATE UNIQUE INDEX "subscriptions_mpCustomerId_key" ON "subscriptions"("mpCustomerId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "subscriptions_pagarmeSubscriptionId_key" ON "subscriptions"("pagarmeSubscriptionId");
+CREATE UNIQUE INDEX "subscriptions_mpPreapprovalId_key" ON "subscriptions"("mpPreapprovalId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "one_time_access_userId_key" ON "one_time_access"("userId");

@@ -4,118 +4,66 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 
-interface PagarMeCustomer {
-  id?: string;
-  external_id: string;
-  name: string;
-  email: string;
-  type: 'individual' | 'company';
-  document: string;
-  phone_numbers: string[];
+interface MPPreference {
+  id: string;
+  init_point: string;
+  external_reference: string;
 }
 
-interface PagarMeSubscription {
-  id: string;
+interface MPPayment {
+  id: number;
   status: string;
-  plan_id: string;
-  customer: { id: string };
-  current_period_start: string;
-  current_period_end: string;
-  payment_method: string;
-  metadata: Record<string, string>;
-}
-
-interface PagarMeTransaction {
-  id: string;
-  status: string;
-  amount: number;
-  payment_method: string;
-  customer: { id: string };
-  metadata: Record<string, string>;
-  boleto_url?: string;
-  pix_qr_code?: string;
-  pix_copy_paste?: string;
+  status_detail: string;
+  payment_type_id: string;
+  external_reference: string;
+  transaction_amount: number;
+  date_created: string;
+  date_approved?: string;
 }
 
 @Injectable()
 export class BillingService {
   private logger = new Logger(BillingService.name);
-  private apiKey: string;
-  private apiUrl = 'https://api.pagar.me/core/v5';
+  private accessToken: string;
+  private apiUrl = 'https://api.mercadopago.com';
 
   constructor(
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
-    this.apiKey = this.config.get<string>('PAGARME_API_KEY') || '';
-    if (!this.apiKey) {
-      this.logger.warn('PAGARME_API_KEY not configured - billing disabled');
+    this.accessToken = this.config.get<string>('MP_ACCESS_TOKEN') || '';
+    if (!this.accessToken) {
+      this.logger.warn('MP_ACCESS_TOKEN not configured - billing disabled');
     }
   }
 
-  private ensureApiKey(): string {
-    if (!this.apiKey) {
+  private ensureToken(): string {
+    if (!this.accessToken) {
       throw new ServiceUnavailableException('Payment not configured');
     }
-    return this.apiKey;
+    return this.accessToken;
   }
 
   private async request(method: string, path: string, body?: any) {
-    const apiKey = this.ensureApiKey();
+    const token = this.ensureToken();
     const url = `${this.apiUrl}${path}`;
 
     const response = await fetch(url, {
       method,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Basic ${Buffer.from(apiKey + ':').toString('base64')}`,
+        Authorization: `Bearer ${token}`,
       },
       body: body ? JSON.stringify(body) : undefined,
     });
 
     if (!response.ok) {
       const error = await response.json();
-      this.logger.error(`Pagar.me error: ${JSON.stringify(error)}`);
+      this.logger.error(`Mercado Pago error: ${JSON.stringify(error)}`);
       throw new Error(error.message || 'Payment provider error');
     }
 
     return response.json();
-  }
-
-  // ========== CUSTOMERS ==========
-
-  async getOrCreateCustomer(userId: string, email: string, name: string) {
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { userId },
-    });
-
-    if (subscription?.pagarmeCustomerId) {
-      return subscription.pagarmeCustomerId;
-    }
-
-    // Create customer in Pagar.me
-    const customer = await this.request('POST', '/customers', {
-      external_id: userId,
-      name,
-      email,
-      type: 'individual',
-      document: '00000000000000', // CPF placeholder - will be updated
-      phone_numbers: ['+5500000000000'],
-    });
-
-    // Save to DB
-    await this.prisma.subscription.upsert({
-      where: { userId },
-      update: { pagarmeCustomerId: customer.id },
-      create: {
-        userId,
-        pagarmeCustomerId: customer.id,
-        plan: 'FREE',
-        status: 'ACTIVE',
-      },
-    });
-
-    return customer.id;
   }
 
   // ========== PRICING ==========
@@ -143,6 +91,61 @@ export class BillingService {
     };
   }
 
+  // ========== CUSTOMERS ==========
+
+  async getOrCreateCustomer(userId: string, email: string, name: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    if (subscription?.mpCustomerId) {
+      return subscription.mpCustomerId;
+    }
+
+    // Search for existing customer by email
+    const searchResult = await this.request(
+      'GET',
+      `/v1/customers/search?email=${encodeURIComponent(email)}`,
+    );
+
+    if (searchResult.results?.length > 0) {
+      const customerId = searchResult.results[0].id;
+      await this.prisma.subscription.upsert({
+        where: { userId },
+        update: { mpCustomerId: String(customerId) },
+        create: {
+          userId,
+          mpCustomerId: String(customerId),
+          plan: 'FREE',
+          status: 'ACTIVE',
+        },
+      });
+      return String(customerId);
+    }
+
+    // Create new customer
+    const customer = await this.request('POST', '/v1/customers', {
+      email,
+      first_name: name.split(' ')[0],
+      last_name: name.split(' ').slice(1).join(' ') || '',
+      description: `FisioTrack user: ${userId}`,
+      metadata: { userId },
+    });
+
+    await this.prisma.subscription.upsert({
+      where: { userId },
+      update: { mpCustomerId: String(customer.id) },
+      create: {
+        userId,
+        mpCustomerId: String(customer.id),
+        plan: 'FREE',
+        status: 'ACTIVE',
+      },
+    });
+
+    return String(customer.id);
+  }
+
   // ========== CHECKOUT ==========
 
   async createSubscriptionCheckout(
@@ -153,50 +156,94 @@ export class BillingService {
   ) {
     const customerId = await this.getOrCreateCustomer(userId, email, name);
     const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    const apiUrl = this.config.get<string>('API_URL') || 'http://localhost:3000';
 
-    // Create subscription in Pagar.me
-    const subscription = await this.request('POST', '/subscriptions', {
-      plan_id: plan === 'monthly'
-        ? this.config.get('PAGARME_PLAN_MONTHLY_ID')
-        : this.config.get('PAGARME_PLAN_YEARLY_ID'),
-      customer_id: customerId,
-      payment_method: 'credit_card',
-      credit_card: {
-        installments: 1,
-        statement_descriptor: 'FISIOTRACK',
+    const amount = plan === 'monthly' ? 1990 : 19000;
+    const title = plan === 'monthly'
+      ? 'FisioTrack PRO - Assinatura Mensal'
+      : 'FisioTrack PRO - Assinatura Anual';
+
+    // Create preference for subscription
+    const preference = await this.request('POST', '/checkout/preferences', {
+      items: [
+        {
+          id: `fisiotrack_${plan}`,
+          title,
+          quantity: 1,
+          unit_price: amount / 100,
+          currency_id: 'BRL',
+        },
+      ],
+      payer: {
+        email,
+        name,
       },
-      metadata: { userId, plan },
-      postback_url: `${this.config.get('API_URL') || 'http://localhost:3000'}/billing/webhook`,
+      external_reference: `sub_${userId}_${plan}`,
+      notification_url: `${apiUrl}/billing/webhook`,
+      back_urls: {
+        success: `${frontendUrl}/settings?payment=success`,
+        failure: `${frontendUrl}/pricing?payment=failure`,
+        pending: `${frontendUrl}/settings?payment=pending`,
+      },
+      auto_return: 'approved',
+      metadata: {
+        userId,
+        plan,
+        type: 'subscription',
+      },
     });
 
-    this.logger.log(`Subscription created for user ${userId}: ${subscription.id}`);
+    this.logger.log(`Preference created for user ${userId}: ${preference.id}`);
 
     return {
-      subscriptionId: subscription.id,
-      checkoutUrl: subscription.checkout_url,
+      preferenceId: preference.id,
+      checkoutUrl: preference.init_point,
     };
   }
 
   async createOneTimeCheckout(userId: string, email: string, name: string) {
     const customerId = await this.getOrCreateCustomer(userId, email, name);
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    const apiUrl = this.config.get<string>('API_URL') || 'http://localhost:3000';
 
-    // Create one-time transaction in Pagar.me
-    const transaction = await this.request('POST', '/transactions', {
-      amount: 1990, // R$ 19,90 in cents
-      customer_id: customerId,
-      payment_methods: ['credit_card', 'pix', 'boleto'],
-      metadata: { userId, type: 'one_time' },
-      postback_url: `${this.config.get('API_URL') || 'http://localhost:3000'}/billing/webhook`,
+    // Create preference for one-time payment
+    const preference = await this.request('POST', '/checkout/preferences', {
+      items: [
+        {
+          id: 'fisiotrack_onetime',
+          title: 'FisioTrack PRO - Acesso 30 dias',
+          quantity: 1,
+          unit_price: 19.90,
+          currency_id: 'BRL',
+        },
+      ],
+      payer: {
+        email,
+        name,
+      },
+      external_reference: `onetime_${userId}`,
+      notification_url: `${apiUrl}/billing/webhook`,
+      back_urls: {
+        success: `${frontendUrl}/settings?payment=success`,
+        failure: `${frontendUrl}/pricing?payment=failure`,
+        pending: `${frontendUrl}/settings?payment=pending`,
+      },
+      auto_return: 'approved',
+      payment_methods: {
+        excluded_payment_types: [],
+        installments: 1,
+      },
+      metadata: {
+        userId,
+        type: 'one_time',
+      },
     });
 
-    this.logger.log(`One-time transaction created for user ${userId}: ${transaction.id}`);
+    this.logger.log(`One-time preference created for user ${userId}: ${preference.id}`);
 
     return {
-      transactionId: transaction.id,
-      paymentUrl: transaction.payment_url,
-      pixQrCode: transaction.pix_qr_code,
-      pixCopyPaste: transaction.pix_copy_paste,
-      boletoUrl: transaction.boleto_url,
+      preferenceId: preference.id,
+      checkoutUrl: preference.init_point,
     };
   }
 
@@ -241,14 +288,16 @@ export class BillingService {
       where: { userId },
     });
 
-    if (!subscription?.pagarmeSubscriptionId) {
+    if (!subscription?.mpPreapprovalId) {
       throw new Error('No active subscription to cancel');
     }
 
-    // Cancel in Pagar.me
-    await this.request('PATCH', `/subscriptions/${subscription.pagarmeSubscriptionId}`, {
-      status: 'canceled',
-    });
+    // Cancel preapproval in Mercado Pago
+    await this.request(
+      'PUT',
+      `/preapproval/${subscription.mpPreapprovalId}`,
+      { status: 'cancelled' },
+    );
 
     // Update DB
     await this.prisma.subscription.update({
@@ -270,14 +319,16 @@ export class BillingService {
       where: { userId },
     });
 
-    if (!subscription?.pagarmeSubscriptionId) {
+    if (!subscription?.mpPreapprovalId) {
       throw new Error('No subscription to reactivate');
     }
 
-    // Reactivate in Pagar.me
-    await this.request('PATCH', `/subscriptions/${subscription.pagarmeSubscriptionId}`, {
-      status: 'active',
-    });
+    // Reactivate preapproval in Mercado Pago
+    await this.request(
+      'PUT',
+      `/preapproval/${subscription.mpPreapprovalId}`,
+      { status: 'authorized' },
+    );
 
     // Update DB
     await this.prisma.subscription.update({
@@ -297,7 +348,7 @@ export class BillingService {
   // ========== WEBHOOKS ==========
 
   verifyWebhookSignature(body: any, signature: string): boolean {
-    const secret = this.config.get<string>('PAGARME_WEBHOOK_SECRET');
+    const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
     if (!secret) return true; // Skip verification if no secret configured
 
     const hash = crypto
@@ -309,136 +360,33 @@ export class BillingService {
   }
 
   async handleWebhook(event: any) {
-    const { type, data } = event;
+    // Mercado Pago sends different webhook formats
+    // topic: "payment" or "preapproval"
+    const { topic, resource } = event;
 
-    this.logger.log(`Webhook received: ${type}`);
+    this.logger.log(`Webhook received: topic=${topic}, resource=${resource}`);
 
     try {
-      switch (type) {
-        case 'subscription_created':
-          await this.handleSubscriptionCreated(data);
-          break;
-        case 'subscription_updated':
-          await this.handleSubscriptionUpdated(data);
-          break;
-        case 'subscription_canceled':
-          await this.handleSubscriptionCanceled(data);
-          break;
-        case 'subscription_success':
-          await this.handleSubscriptionSuccess(data);
-          break;
-        case 'subscription_failed':
-          await this.handleSubscriptionFailed(data);
-          break;
-        case 'transaction_created':
-        case 'transaction_updated':
-          await this.handleTransaction(data);
-          break;
-        default:
-          this.logger.log(`Unhandled webhook type: ${type}`);
+      if (topic === 'payment') {
+        await this.handlePaymentWebhook(resource);
+      } else if (topic === 'preapproval') {
+        await this.handlePreapprovalWebhook(resource);
       }
     } catch (error) {
-      this.logger.error(`Error processing webhook ${type}:`, error);
+      this.logger.error(`Error processing webhook topic=${topic}:`, error);
     }
   }
 
-  private async handleSubscriptionCreated(data: PagarMeSubscription) {
-    const userId = data.metadata?.userId;
-    if (!userId) return;
+  private async handlePaymentWebhook(paymentId: string) {
+    // Fetch payment details
+    const payment: MPPayment = await this.request('GET', `/v1/payments/${paymentId}`);
 
-    await this.prisma.subscription.upsert({
-      where: { userId },
-      update: {
-        pagarmeSubscriptionId: data.id,
-        plan: 'PRO',
-        status: 'ACTIVE',
-        currentPeriodStart: new Date(data.current_period_start),
-        currentPeriodEnd: new Date(data.current_period_end),
-      },
-      create: {
-        userId,
-        pagarmeSubscriptionId: data.id,
-        plan: 'PRO',
-        status: 'ACTIVE',
-        currentPeriodStart: new Date(data.current_period_start),
-        currentPeriodEnd: new Date(data.current_period_end),
-      },
-    });
-
-    this.logger.log(`Subscription created for user ${userId}`);
-  }
-
-  private async handleSubscriptionUpdated(data: PagarMeSubscription) {
-    const userId = data.metadata?.userId;
-    if (!userId) return;
-
-    const statusMap: Record<string, SubscriptionStatus> = {
-      active: SubscriptionStatus.ACTIVE,
-      canceled: SubscriptionStatus.CANCELLED,
-      past_due: SubscriptionStatus.PAST_DUE,
-      unpaid: SubscriptionStatus.UNPAID,
-    };
-
-    const newStatus: SubscriptionStatus = statusMap[data.status] || SubscriptionStatus.ACTIVE;
-
-    await this.prisma.subscription.updateMany({
-      where: { pagarmeSubscriptionId: data.id },
-      data: {
-        status: newStatus,
-        currentPeriodStart: new Date(data.current_period_start),
-        currentPeriodEnd: new Date(data.current_period_end),
-      },
-    });
-  }
-
-  private async handleSubscriptionCanceled(data: PagarMeSubscription) {
-    const userId = data.metadata?.userId;
-    if (!userId) return;
-
-    await this.prisma.subscription.updateMany({
-      where: { pagarmeSubscriptionId: data.id },
-      data: {
-        plan: 'FREE',
-        status: 'CANCELLED',
-        cancelAtPeriodEnd: false,
-      },
-    });
-
-    this.logger.log(`Subscription cancelled for user ${userId}`);
-  }
-
-  private async handleSubscriptionSuccess(data: PagarMeSubscription) {
-    const userId = data.metadata?.userId;
-    if (!userId) return;
-
-    await this.prisma.subscription.updateMany({
-      where: { pagarmeSubscriptionId: data.id },
-      data: {
-        status: 'ACTIVE',
-        currentPeriodStart: new Date(data.current_period_start),
-        currentPeriodEnd: new Date(data.current_period_end),
-      },
-    });
-  }
-
-  private async handleSubscriptionFailed(data: PagarMeSubscription) {
-    const userId = data.metadata?.userId;
-    if (!userId) return;
-
-    await this.prisma.subscription.updateMany({
-      where: { pagarmeSubscriptionId: data.id },
-      data: { status: 'PAST_DUE' },
-    });
-  }
-
-  private async handleTransaction(data: PagarMeTransaction) {
-    const userId = data.metadata?.userId;
-    const type = data.metadata?.type;
-
-    if (!userId) return;
+    const externalRef = payment.external_reference || '';
 
     // Handle one-time payment
-    if (type === 'one_time' && data.status === 'paid') {
+    if (externalRef.startsWith('onetime_') && payment.status === 'approved') {
+      const userId = externalRef.replace('onetime_', '');
+
       const expiresAt = new Date();
       expiresAt.setMonth(expiresAt.getMonth() + 1);
 
@@ -446,12 +394,12 @@ export class BillingService {
         where: { userId },
         update: {
           expiresAt,
-          transactionId: data.id,
+          transactionId: String(payment.id),
         },
         create: {
           userId,
           expiresAt,
-          transactionId: data.id,
+          transactionId: String(payment.id),
         },
       });
 
@@ -464,5 +412,75 @@ export class BillingService {
 
       this.logger.log(`One-time access granted for user ${userId}, expires ${expiresAt}`);
     }
+
+    // Handle subscription payment
+    if (externalRef.startsWith('sub_') && payment.status === 'approved') {
+      const parts = externalRef.split('_');
+      const userId = parts[1];
+      const plan = parts[2];
+
+      // Update subscription
+      await this.prisma.subscription.upsert({
+        where: { userId },
+        update: {
+          plan: 'PRO',
+          status: 'ACTIVE',
+        },
+        create: {
+          userId,
+          plan: 'PRO',
+          status: 'ACTIVE',
+        },
+      });
+
+      this.logger.log(`Subscription payment approved for user ${userId}`);
+    }
+  }
+
+  private async handlePreapprovalWebhook(preapprovalId: string) {
+    // Fetch preapproval details
+    const preapproval = await this.request('GET', `/preapproval/${preapprovalId}`);
+
+    const metadata = preapproval.metadata || {};
+    const userId = metadata.userId;
+
+    if (!userId) return;
+
+    const statusMap: Record<string, SubscriptionStatus> = {
+      authorized: SubscriptionStatus.ACTIVE,
+      paused: SubscriptionStatus.PAST_DUE,
+      cancelled: SubscriptionStatus.CANCELLED,
+      terminated: SubscriptionStatus.CANCELLED,
+    };
+
+    const newStatus = statusMap[preapproval.status] || SubscriptionStatus.ACTIVE;
+
+    await this.prisma.subscription.upsert({
+      where: { userId },
+      update: {
+        mpPreapprovalId: preapprovalId,
+        status: newStatus,
+        currentPeriodStart: preapproval.date_created
+          ? new Date(preapproval.date_created)
+          : undefined,
+        currentPeriodEnd: preapproval.next_payment_date
+          ? new Date(preapproval.next_payment_date)
+          : undefined,
+      },
+      create: {
+        userId,
+        mpPreapprovalId: preapprovalId,
+        plan: 'PRO',
+        status: newStatus,
+        currentPeriodStart: preapproval.date_created
+          ? new Date(preapproval.date_created)
+          : undefined,
+        currentPeriodEnd: preapproval.next_payment_date
+          ? new Date(preapproval.next_payment_date)
+          : undefined,
+      },
+    });
+
+    this.logger.log(`Preapproval ${preapprovalId} updated for user ${userId}: ${preapproval.status}`);
   }
 }

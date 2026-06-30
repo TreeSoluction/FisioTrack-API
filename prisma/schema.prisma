@@ -222,8 +222,8 @@ model Subscription {
   id                     String             @id @default(cuid())
   userId                 String             @unique
   user                   User               @relation(fields: [userId], references: [id])
-  pagarmeCustomerId      String?            @unique
-  pagarmeSubscriptionId  String?            @unique
+  mpCustomerId           String?            @unique
+  mpPreapprovalId        String?            @unique
   plan                   PlanType           @default(FREE)
   status                 SubscriptionStatus @default(ACTIVE)
   currentPeriodStart     DateTime?

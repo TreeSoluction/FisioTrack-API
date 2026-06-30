@@ -36,10 +36,8 @@ describe('BillingService', () => {
     prisma = createPrismaMock();
     service = new BillingService(
       createConfigMock({
-        PAGARME_API_KEY: 'test-api-key',
-        PAGARME_WEBHOOK_SECRET: 'test-webhook-secret',
-        PAGARME_PLAN_MONTHLY_ID: 'plan_monthly_123',
-        PAGARME_PLAN_YEARLY_ID: 'plan_yearly_456',
+        MP_ACCESS_TOKEN: 'test-access-token',
+        MP_WEBHOOK_SECRET: 'test-webhook-secret',
         API_URL: 'http://localhost:3000',
         FRONTEND_URL: 'http://localhost:5173',
       }),
@@ -47,15 +45,15 @@ describe('BillingService', () => {
     );
   });
 
-  describe('ensureApiKey', () => {
-    it('should throw when API key not configured for API calls', async () => {
-      const serviceWithoutKey = new BillingService(
+  describe('ensureToken', () => {
+    it('should throw when access token not configured', async () => {
+      const serviceWithoutToken = new BillingService(
         createConfigMock({}),
         prisma as any,
       );
 
       prisma.subscription.findUnique.mockResolvedValue(null);
-      await expect(serviceWithoutKey.getOrCreateCustomer('user1', 'a@b.com', 'Test')).rejects.toThrow(
+      await expect(serviceWithoutToken.getOrCreateCustomer('user1', 'a@b.com', 'Test')).rejects.toThrow(
         ServiceUnavailableException,
       );
     });
@@ -82,7 +80,7 @@ describe('BillingService', () => {
   describe('getOrCreateCustomer', () => {
     it('should return existing customer ID from DB', async () => {
       prisma.subscription.findUnique.mockResolvedValue({
-        pagarmeCustomerId: 'cust_existing_123',
+        mpCustomerId: 'cust_existing_123',
       });
 
       const result = await service.getOrCreateCustomer('user1', 'test@email.com', 'Test User');
@@ -91,30 +89,49 @@ describe('BillingService', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it('should create new customer in Pagar.me when not in DB', async () => {
+    it('should create new customer in Mercado Pago when not in DB', async () => {
       prisma.subscription.findUnique.mockResolvedValue(null);
-      mockFetch.mockResolvedValue({
+      // First call: search
+      mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ id: 'cust_new_456' }),
+        json: () => Promise.resolve({ results: [] }),
+      });
+      // Second call: create
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 12345 }),
       });
 
       const result = await service.getOrCreateCustomer('user1', 'test@email.com', 'Test User');
 
-      expect(result).toBe('cust_new_456');
+      expect(result).toBe('12345');
       expect(prisma.subscription.upsert).toHaveBeenCalled();
+    });
+
+    it('should find existing customer by email', async () => {
+      prisma.subscription.findUnique.mockResolvedValue(null);
+      // Search returns existing customer
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ results: [{ id: 99999 }] }),
+      });
+
+      const result = await service.getOrCreateCustomer('user1', 'test@email.com', 'Test User');
+
+      expect(result).toBe('99999');
     });
   });
 
   describe('createSubscriptionCheckout', () => {
     it('should create checkout for monthly plan', async () => {
       prisma.subscription.findUnique.mockResolvedValue({
-        pagarmeCustomerId: 'cust_123',
+        mpCustomerId: 'cust_123',
       });
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({
-          id: 'sub_789',
-          checkout_url: 'https://checkout.pagar.me/abc',
+          id: 'pref_789',
+          init_point: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=abc',
         }),
       });
 
@@ -122,25 +139,19 @@ describe('BillingService', () => {
         'user1', 'test@email.com', 'Test User', 'monthly',
       );
 
-      expect(result.checkoutUrl).toBe('https://checkout.pagar.me/abc');
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/subscriptions'),
-        expect.objectContaining({
-          method: 'POST',
-          body: expect.stringContaining('plan_monthly_123'),
-        }),
-      );
+      expect(result.checkoutUrl).toContain('mercadopago.com.br');
+      expect(result.preferenceId).toBe('pref_789');
     });
 
     it('should create checkout for yearly plan', async () => {
       prisma.subscription.findUnique.mockResolvedValue({
-        pagarmeCustomerId: 'cust_123',
+        mpCustomerId: 'cust_123',
       });
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({
-          id: 'sub_789',
-          checkout_url: 'https://checkout.pagar.me/abc',
+          id: 'pref_789',
+          init_point: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=abc',
         }),
       });
 
@@ -148,26 +159,20 @@ describe('BillingService', () => {
         'user1', 'test@email.com', 'Test User', 'yearly',
       );
 
-      expect(result.checkoutUrl).toBe('https://checkout.pagar.me/abc');
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/subscriptions'),
-        expect.objectContaining({
-          body: expect.stringContaining('plan_yearly_456'),
-        }),
-      );
+      expect(result.checkoutUrl).toContain('mercadopago.com.br');
     });
   });
 
   describe('createOneTimeCheckout', () => {
     it('should create one-time payment', async () => {
       prisma.subscription.findUnique.mockResolvedValue({
-        pagarmeCustomerId: 'cust_123',
+        mpCustomerId: 'cust_123',
       });
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({
-          id: 'txn_789',
-          payment_url: 'https://checkout.pagar.me/xyz',
+          id: 'pref_xyz',
+          init_point: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=xyz',
         }),
       });
 
@@ -175,8 +180,8 @@ describe('BillingService', () => {
         'user1', 'test@email.com', 'Test User',
       );
 
-      expect(result.transactionId).toBe('txn_789');
-      expect(result.paymentUrl).toBe('https://checkout.pagar.me/xyz');
+      expect(result.preferenceId).toBe('pref_xyz');
+      expect(result.checkoutUrl).toContain('mercadopago.com.br');
     });
   });
 
@@ -227,11 +232,11 @@ describe('BillingService', () => {
   describe('cancelSubscription', () => {
     it('should cancel subscription', async () => {
       prisma.subscription.findUnique.mockResolvedValue({
-        pagarmeSubscriptionId: 'sub_123',
+        mpPreapprovalId: 'preapproval_123',
       });
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ status: 'canceled' }),
+        json: () => Promise.resolve({}),
       });
 
       const result = await service.cancelSubscription('user1');
@@ -282,36 +287,45 @@ describe('BillingService', () => {
   });
 
   describe('handleWebhook', () => {
-    it('should handle subscription_created event', async () => {
-      await service.handleWebhook({
-        type: 'subscription_created',
-        data: {
-          id: 'sub_123',
-          status: 'active',
-          plan_id: 'plan_monthly',
-          customer: { id: 'cust_123' },
-          current_period_start: '2026-01-01',
-          current_period_end: '2026-02-01',
-          metadata: { userId: 'user1' },
-        },
+    it('should handle payment webhook for one-time', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          id: 12345,
+          status: 'approved',
+          external_reference: 'onetime_user1',
+          payment_type_id: 'credit_card',
+          transaction_amount: 19.90,
+          date_created: '2026-01-01T00:00:00.000-03:00',
+        }),
       });
 
-      expect(prisma.subscription.upsert).toHaveBeenCalled();
-    });
-
-    it('should handle transaction with one_time payment', async () => {
       await service.handleWebhook({
-        type: 'transaction_updated',
-        data: {
-          id: 'txn_123',
-          status: 'paid',
-          amount: 1990,
-          customer: { id: 'cust_123' },
-          metadata: { userId: 'user1', type: 'one_time' },
-        },
+        topic: 'payment',
+        resource: '12345',
       });
 
       expect(prisma.oneTimeAccess.upsert).toHaveBeenCalled();
+      expect(prisma.subscription.upsert).toHaveBeenCalled();
+    });
+
+    it('should handle preapproval webhook', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'preapproval_123',
+          status: 'authorized',
+          metadata: { userId: 'user1' },
+          date_created: '2026-01-01T00:00:00.000-03:00',
+          next_payment_date: '2026-02-01T00:00:00.000-03:00',
+        }),
+      });
+
+      await service.handleWebhook({
+        topic: 'preapproval',
+        resource: 'preapproval_123',
+      });
+
       expect(prisma.subscription.upsert).toHaveBeenCalled();
     });
   });
