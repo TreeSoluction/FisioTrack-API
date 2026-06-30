@@ -24,6 +24,7 @@ model User {
   enterpriseRequest EnterpriseRequest?
   review      Review?
   subscription Subscription?
+  oneTimeAccess OneTimeAccess?
 
   @@map("users")
 }
@@ -218,22 +219,32 @@ model Review {
 }
 
 model Subscription {
-  id                   String             @id @default(cuid())
-  userId               String             @unique
-  user                 User               @relation(fields: [userId], references: [id])
-  stripeCustomerId     String?            @unique
-  stripeSubscriptionId String?            @unique
-  stripePriceId        String?
-  plan                 PlanType           @default(FREE)
-  status               SubscriptionStatus @default(ACTIVE)
-  currentPeriodStart   DateTime?
-  currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean            @default(false)
-  priceChangedAt       DateTime?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  id                     String             @id @default(cuid())
+  userId                 String             @unique
+  user                   User               @relation(fields: [userId], references: [id])
+  pagarmeCustomerId      String?            @unique
+  pagarmeSubscriptionId  String?            @unique
+  plan                   PlanType           @default(FREE)
+  status                 SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean            @default(false)
+  priceChangedAt         DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   @@map("subscriptions")
+}
+
+model OneTimeAccess {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  expiresAt     DateTime
+  transactionId String?
+  createdAt     DateTime @default(now())
+
+  @@map("one_time_access")
 }
 
 model WebhookEvent {

@@ -8,14 +8,11 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  RawBodyRequest,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Request, Response } from 'express';
-import Stripe from 'stripe';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BillingService } from './billing.service';
-import { CreateCheckoutDto } from './dto/create-checkout.dto';
 
 @ApiTags('billing')
 @Controller('billing')
@@ -23,30 +20,38 @@ export class BillingController {
   constructor(private billingService: BillingService) {}
 
   @Get('pricing')
-  @ApiOperation({ summary: 'Get product prices' })
+  @ApiOperation({ summary: 'Get pricing information' })
   async getPricing() {
-    return this.billingService.getProductWithPrices();
+    return this.billingService.getPricing();
   }
 
   @Post('checkout')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Create Stripe Checkout Session' })
-  async createCheckout(@Req() req: any, @Body() body: CreateCheckoutDto) {
-    return this.billingService.createCheckoutSession(
+  @ApiOperation({ summary: 'Create subscription checkout (monthly/yearly)' })
+  async createCheckout(
+    @Req() req: any,
+    @Body() body: { plan: 'monthly' | 'yearly' },
+  ) {
+    return this.billingService.createSubscriptionCheckout(
       req.user.id,
       req.user.email,
       req.user.name,
-      body.interval,
+      body.plan,
     );
   }
 
-  @Post('portal')
+  @Post('checkout-onetime')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Create Stripe Billing Portal Session' })
-  async createPortal(@Req() req: any) {
-    return this.billingService.createPortalSession(req.user.id);
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Create one-time payment checkout' })
+  async createOneTimeCheckout(@Req() req: any) {
+    return this.billingService.createOneTimeCheckout(
+      req.user.id,
+      req.user.email,
+      req.user.name,
+    );
   }
 
   @Get('subscription')
@@ -61,7 +66,7 @@ export class BillingController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Cancel subscription at period end' })
+  @ApiOperation({ summary: 'Cancel subscription' })
   async cancelSubscription(@Req() req: any) {
     return this.billingService.cancelSubscription(req.user.id);
   }
@@ -76,26 +81,18 @@ export class BillingController {
   }
 
   @Post('webhook')
-  @ApiOperation({ summary: 'Stripe webhook handler' })
-  async handleWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Res() res: Response,
-  ) {
-    const sig = req.headers['stripe-signature'] as string | undefined;
+  @ApiOperation({ summary: 'Pagar.me webhook handler' })
+  async handleWebhook(@Req() req: Request, @Res() res: Response) {
+    const signature = req.headers['x-pagarme-signature'] as string;
 
-    let event: Stripe.Event;
-
-    try {
-      event = this.billingService.verifyWebhookSignature(req.rawBody, sig);
-    } catch (err: any) {
-      console.error('Webhook signature verification failed:', err.message);
-      res.status(400).json({ error: `Webhook Error: ${err.message}` });
+    if (!this.billingService.verifyWebhookSignature(req.body, signature)) {
+      res.status(400).json({ error: 'Invalid signature' });
       return;
     }
 
     try {
-      await this.billingService.handleWebhookEvent(event);
-      res.json({ received: true });
+      await this.billingService.handleWebhook(req.body);
+      res.json({ ok: true });
     } catch (err: any) {
       console.error('Webhook handling error:', err);
       res.status(500).json({ error: 'Webhook handling failed' });

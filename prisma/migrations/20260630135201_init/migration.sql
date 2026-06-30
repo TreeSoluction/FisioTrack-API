@@ -162,9 +162,8 @@ CREATE TABLE "reviews" (
 CREATE TABLE "subscriptions" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "stripeCustomerId" TEXT,
-    "stripeSubscriptionId" TEXT,
-    "stripePriceId" TEXT,
+    "pagarmeCustomerId" TEXT,
+    "pagarmeSubscriptionId" TEXT,
     "plan" "PlanType" NOT NULL DEFAULT 'FREE',
     "status" "SubscriptionStatus" NOT NULL DEFAULT 'ACTIVE',
     "currentPeriodStart" TIMESTAMP(3),
@@ -175,6 +174,17 @@ CREATE TABLE "subscriptions" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "one_time_access" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "transactionId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "one_time_access_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -207,10 +217,13 @@ CREATE UNIQUE INDEX "reviews_userId_key" ON "reviews"("userId");
 CREATE UNIQUE INDEX "subscriptions_userId_key" ON "subscriptions"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "subscriptions_stripeCustomerId_key" ON "subscriptions"("stripeCustomerId");
+CREATE UNIQUE INDEX "subscriptions_pagarmeCustomerId_key" ON "subscriptions"("pagarmeCustomerId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "subscriptions_stripeSubscriptionId_key" ON "subscriptions"("stripeSubscriptionId");
+CREATE UNIQUE INDEX "subscriptions_pagarmeSubscriptionId_key" ON "subscriptions"("pagarmeSubscriptionId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "one_time_access_userId_key" ON "one_time_access"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "webhook_events_stripeEventId_key" ON "webhook_events"("stripeEventId");
@@ -247,3 +260,6 @@ ALTER TABLE "reviews" ADD CONSTRAINT "reviews_userId_fkey" FOREIGN KEY ("userId"
 
 -- AddForeignKey
 ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "one_time_access" ADD CONSTRAINT "one_time_access_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

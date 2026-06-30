@@ -1,196 +1,115 @@
-import {
-  Injectable,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
+import { SubscriptionStatus } from '@prisma/client';
+import * as crypto from 'crypto';
 
-interface CachedPrices {
-  monthly: { priceId: string; amount: number; currency: string } | null;
-  yearly: {
-    priceId: string;
-    amount: number;
-    currency: string;
-    monthlyEquivalent: number;
-    discountPercent: number;
-  } | null;
-  cachedAt: number;
+interface PagarMeCustomer {
+  id?: string;
+  external_id: string;
+  name: string;
+  email: string;
+  type: 'individual' | 'company';
+  document: string;
+  phone_numbers: string[];
+}
+
+interface PagarMeSubscription {
+  id: string;
+  status: string;
+  plan_id: string;
+  customer: { id: string };
+  current_period_start: string;
+  current_period_end: string;
+  payment_method: string;
+  metadata: Record<string, string>;
+}
+
+interface PagarMeTransaction {
+  id: string;
+  status: string;
+  amount: number;
+  payment_method: string;
+  customer: { id: string };
+  metadata: Record<string, string>;
+  boleto_url?: string;
+  pix_qr_code?: string;
+  pix_copy_paste?: string;
 }
 
 @Injectable()
 export class BillingService {
-  private stripe: Stripe | null = null;
   private logger = new Logger(BillingService.name);
-  private pricesCache: CachedPrices | null = null;
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  private apiKey: string;
+  private apiUrl = 'https://api.pagar.me/core/v5';
 
   constructor(
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
-    const secretKey = this.config.get<string>('STRIPE_SECRET_KEY');
-    if (secretKey) {
-      this.stripe = new Stripe(secretKey);
-      this.logger.log('Stripe initialized');
-    } else {
-      this.logger.warn('Stripe not configured - billing disabled');
+    this.apiKey = this.config.get<string>('PAGARME_API_KEY') || '';
+    if (!this.apiKey) {
+      this.logger.warn('PAGARME_API_KEY not configured - billing disabled');
     }
   }
 
-  private ensureStripe(): Stripe {
-    if (!this.stripe) {
+  private ensureApiKey(): string {
+    if (!this.apiKey) {
       throw new ServiceUnavailableException('Payment not configured');
     }
-    return this.stripe;
+    return this.apiKey;
   }
 
-  verifyWebhookSignature(rawBody: any, sig: string | undefined): Stripe.Event {
-    const stripe = this.ensureStripe();
-    const secret = this.config.get<string>('STRIPE_WEBHOOK_SECRET');
-    if (!secret) {
-      throw new Error('STRIPE_WEBHOOK_SECRET not configured');
-    }
-    if (!sig) {
-      throw new Error('Missing stripe-signature header');
-    }
-    return stripe.webhooks.constructEvent(rawBody, sig, secret);
-  }
+  private async request(method: string, path: string, body?: any) {
+    const apiKey = this.ensureApiKey();
+    const url = `${this.apiUrl}${path}`;
 
-  async getProductWithPrices() {
-    const stripe = this.ensureStripe();
-    const productId = this.config.get<string>('STRIPE_PRODUCT_ID');
-
-    if (!productId) {
-      return { product: null, prices: { monthly: null, yearly: null } };
-    }
-
-    if (
-      this.pricesCache &&
-      Date.now() - this.pricesCache.cachedAt < this.CACHE_TTL
-    ) {
-      const product = await stripe.products.retrieve(productId);
-      return {
-        product: {
-          id: product.id,
-          name: product.name,
-          description: product.description,
-          images: product.images,
-        },
-        prices: {
-          monthly: this.pricesCache.monthly,
-          yearly: this.pricesCache.yearly,
-        },
-      };
-    }
-
-    const prices = await stripe.prices.list({
-      product: productId,
-      active: true,
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Basic ${Buffer.from(apiKey + ':').toString('base64')}`,
+      },
+      body: body ? JSON.stringify(body) : undefined,
     });
 
-    let monthly = null;
-    let yearly = null;
-
-    for (const price of prices.data) {
-      if (price.recurring?.interval === 'month') {
-        monthly = {
-          priceId: price.id,
-          amount: price.unit_amount || 0,
-          currency: price.currency,
-        };
-      } else if (price.recurring?.interval === 'year') {
-        yearly = {
-          priceId: price.id,
-          amount: price.unit_amount || 0,
-          currency: price.currency,
-          monthlyEquivalent: 0,
-          discountPercent: 0,
-        };
-      }
+    if (!response.ok) {
+      const error = await response.json();
+      this.logger.error(`Pagar.me error: ${JSON.stringify(error)}`);
+      throw new Error(error.message || 'Payment provider error');
     }
 
-    if (monthly && yearly) {
-      const monthlyTotal = monthly.amount * 12;
-      yearly.monthlyEquivalent = Math.round(yearly.amount / 12);
-      yearly.discountPercent = Math.round(
-        (1 - yearly.amount / monthlyTotal) * 100,
-      );
-    }
-
-    this.pricesCache = { monthly, yearly, cachedAt: Date.now() };
-
-    const product = await stripe.products.retrieve(productId);
-    return {
-      product: {
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        images: product.images,
-      },
-      prices: { monthly, yearly },
-    };
+    return response.json();
   }
 
-  async getOrCreateStripeCustomer(userId: string, email: string, name: string) {
-    const stripe = this.ensureStripe();
+  // ========== CUSTOMERS ==========
 
+  async getOrCreateCustomer(userId: string, email: string, name: string) {
     const subscription = await this.prisma.subscription.findUnique({
       where: { userId },
     });
 
-    if (subscription?.stripeCustomerId) {
-      try {
-        const customer = await stripe.customers.retrieve(
-          subscription.stripeCustomerId,
-        );
-        if (customer.deleted) {
-          await this.prisma.subscription.update({
-            where: { userId },
-            data: { stripeCustomerId: null },
-          });
-        } else {
-          return subscription.stripeCustomerId;
-        }
-      } catch {
-        await this.prisma.subscription.update({
-          where: { userId },
-          data: { stripeCustomerId: null },
-        });
-      }
+    if (subscription?.pagarmeCustomerId) {
+      return subscription.pagarmeCustomerId;
     }
 
-    const existing = await stripe.customers.search({
-      query: `metadata["userId"]:"${userId}"`,
-    });
-    if (existing.data.length > 0) {
-      const customerId = existing.data[0].id;
-      await this.prisma.subscription.upsert({
-        where: { userId },
-        update: { stripeCustomerId: customerId },
-        create: {
-          userId,
-          stripeCustomerId: customerId,
-          plan: 'FREE',
-          status: 'ACTIVE',
-        },
-      });
-      return customerId;
-    }
-
-    const customer = await stripe.customers.create({
-      email,
+    // Create customer in Pagar.me
+    const customer = await this.request('POST', '/customers', {
+      external_id: userId,
       name,
-      metadata: { userId },
+      email,
+      type: 'individual',
+      document: '00000000000000', // CPF placeholder - will be updated
+      phone_numbers: ['+5500000000000'],
     });
 
+    // Save to DB
     await this.prisma.subscription.upsert({
       where: { userId },
-      update: { stripeCustomerId: customer.id },
+      update: { pagarmeCustomerId: customer.id },
       create: {
         userId,
-        stripeCustomerId: customer.id,
+        pagarmeCustomerId: customer.id,
         plan: 'FREE',
         status: 'ACTIVE',
       },
@@ -199,62 +118,89 @@ export class BillingService {
     return customer.id;
   }
 
-  async createCheckoutSession(
+  // ========== PRICING ==========
+
+  async getPricing() {
+    return {
+      monthly: {
+        amount: 1990,
+        currency: 'BRL',
+        label: 'Mensal',
+      },
+      yearly: {
+        amount: 19000,
+        currency: 'BRL',
+        monthlyEquivalent: 1583,
+        discountPercent: 20,
+        label: 'Anual',
+      },
+      onetime: {
+        amount: 1990,
+        currency: 'BRL',
+        durationDays: 30,
+        label: 'Avulso',
+      },
+    };
+  }
+
+  // ========== CHECKOUT ==========
+
+  async createSubscriptionCheckout(
     userId: string,
     email: string,
     name: string,
-    interval: 'month' | 'year',
+    plan: 'monthly' | 'yearly',
   ) {
-    const stripe = this.ensureStripe();
-    const frontendUrl =
-      this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    const customerId = await this.getOrCreateCustomer(userId, email, name);
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173';
 
-    const customerId = await this.getOrCreateStripeCustomer(
-      userId,
-      email,
-      name,
-    );
-
-    const prices = await this.getProductWithPrices();
-    const price =
-      interval === 'month' ? prices.prices.monthly : prices.prices.yearly;
-
-    if (!price) {
-      throw new Error('Price not found for interval: ' + interval);
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      line_items: [{ price: price.priceId, quantity: 1 }],
-      metadata: { userId },
-      success_url: `${frontendUrl}/settings?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${frontendUrl}/pricing`,
+    // Create subscription in Pagar.me
+    const subscription = await this.request('POST', '/subscriptions', {
+      plan_id: plan === 'monthly'
+        ? this.config.get('PAGARME_PLAN_MONTHLY_ID')
+        : this.config.get('PAGARME_PLAN_YEARLY_ID'),
+      customer_id: customerId,
+      payment_method: 'credit_card',
+      credit_card: {
+        installments: 1,
+        statement_descriptor: 'FISIOTRACK',
+      },
+      metadata: { userId, plan },
+      postback_url: `${this.config.get('API_URL') || 'http://localhost:3000'}/billing/webhook`,
     });
 
-    return { url: session.url };
+    this.logger.log(`Subscription created for user ${userId}: ${subscription.id}`);
+
+    return {
+      subscriptionId: subscription.id,
+      checkoutUrl: subscription.checkout_url,
+    };
   }
 
-  async createPortalSession(userId: string) {
-    const stripe = this.ensureStripe();
-    const frontendUrl =
-      this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+  async createOneTimeCheckout(userId: string, email: string, name: string) {
+    const customerId = await this.getOrCreateCustomer(userId, email, name);
 
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { userId },
-    });
-    if (!subscription?.stripeCustomerId) {
-      throw new Error('No Stripe customer found');
-    }
-
-    const session = await stripe.billingPortal.sessions.create({
-      customer: subscription.stripeCustomerId,
-      return_url: `${frontendUrl}/settings`,
+    // Create one-time transaction in Pagar.me
+    const transaction = await this.request('POST', '/transactions', {
+      amount: 1990, // R$ 19,90 in cents
+      customer_id: customerId,
+      payment_methods: ['credit_card', 'pix', 'boleto'],
+      metadata: { userId, type: 'one_time' },
+      postback_url: `${this.config.get('API_URL') || 'http://localhost:3000'}/billing/webhook`,
     });
 
-    return { url: session.url };
+    this.logger.log(`One-time transaction created for user ${userId}: ${transaction.id}`);
+
+    return {
+      transactionId: transaction.id,
+      paymentUrl: transaction.payment_url,
+      pixQrCode: transaction.pix_qr_code,
+      pixCopyPaste: transaction.pix_copy_paste,
+      boletoUrl: transaction.boleto_url,
+    };
   }
+
+  // ========== SUBSCRIPTION MANAGEMENT ==========
 
   async getSubscriptionStatus(userId: string) {
     const subscription = await this.prisma.subscription.findUnique({
@@ -262,12 +208,22 @@ export class BillingService {
     });
 
     if (!subscription) {
-      return {
-        plan: 'FREE',
-        status: 'ACTIVE',
-        currentPeriodEnd: null,
-        cancelAtPeriodEnd: false,
-      };
+      return { plan: 'FREE', status: 'ACTIVE', currentPeriodEnd: null, cancelAtPeriodEnd: false };
+    }
+
+    // Check one-time access expiration
+    const oneTimeAccess = await this.prisma.oneTimeAccess.findUnique({
+      where: { userId },
+    });
+
+    if (oneTimeAccess && new Date() > oneTimeAccess.expiresAt) {
+      // One-time access expired - downgrade to FREE
+      await this.prisma.subscription.update({
+        where: { userId },
+        data: { plan: 'FREE' },
+      });
+      await this.prisma.oneTimeAccess.delete({ where: { userId } });
+      return { plan: 'FREE', status: 'ACTIVE', currentPeriodEnd: null, cancelAtPeriodEnd: false };
     }
 
     return {
@@ -275,225 +231,238 @@ export class BillingService {
       status: subscription.status,
       currentPeriodEnd: subscription.currentPeriodEnd,
       cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+      isOneTime: !!oneTimeAccess,
+      oneTimeExpiresAt: oneTimeAccess?.expiresAt,
     };
   }
 
   async cancelSubscription(userId: string) {
-    const stripe = this.ensureStripe();
-
     const subscription = await this.prisma.subscription.findUnique({
       where: { userId },
     });
-    if (!subscription?.stripeSubscriptionId) {
+
+    if (!subscription?.pagarmeSubscriptionId) {
       throw new Error('No active subscription to cancel');
     }
 
-    await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-      cancel_at_period_end: true,
+    // Cancel in Pagar.me
+    await this.request('PATCH', `/subscriptions/${subscription.pagarmeSubscriptionId}`, {
+      status: 'canceled',
     });
 
+    // Update DB
     await this.prisma.subscription.update({
       where: { userId },
-      data: { cancelAtPeriodEnd: true },
-    });
-
-    return {
-      message:
-        'Subscription will be cancelled at the end of the billing period',
-    };
-  }
-
-  async reactivateSubscription(userId: string) {
-    const stripe = this.ensureStripe();
-
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { userId },
-    });
-    if (!subscription?.stripeSubscriptionId) {
-      throw new Error('No subscription to reactivate');
-    }
-
-    await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-      cancel_at_period_end: false,
-    });
-
-    await this.prisma.subscription.update({
-      where: { userId },
-      data: { cancelAtPeriodEnd: false },
-    });
-
-    return { message: 'Subscription reactivated' };
-  }
-
-  async handleWebhookEvent(event: Stripe.Event) {
-    const stripe = this.ensureStripe();
-
-    const existing = await this.prisma.webhookEvent.findUnique({
-      where: { stripeEventId: event.id },
-    });
-
-    if (existing?.processed) {
-      this.logger.log(`Event ${event.id} already processed, skipping`);
-      return;
-    }
-
-    await this.prisma.webhookEvent.upsert({
-      where: { stripeEventId: event.id },
-      update: {},
-      create: { stripeEventId: event.id, type: event.type },
-    });
-
-    try {
-      switch (event.type) {
-        case 'checkout.session.completed':
-          await this.handleCheckoutCompleted(event.data.object);
-          break;
-        case 'customer.subscription.updated':
-          await this.handleSubscriptionUpdated(event.data.object);
-          break;
-        case 'customer.subscription.deleted':
-          await this.handleSubscriptionDeleted(event.data.object);
-          break;
-        case 'invoice.payment_failed':
-          await this.handlePaymentFailed(event.data.object);
-          break;
-      }
-
-      await this.prisma.webhookEvent.update({
-        where: { stripeEventId: event.id },
-        data: { processed: true },
-      });
-    } catch (error) {
-      this.logger.error(`Error processing event ${event.type}:`, error);
-    }
-  }
-
-  private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-    const userId = session.metadata?.userId;
-    if (!userId) return;
-
-    const subscriptionId = session.subscription as string;
-    if (!subscriptionId) return;
-
-    const subscription = (await this.ensureStripe().subscriptions.retrieve(
-      subscriptionId,
-    )) as any;
-
-    await this.prisma.subscription.upsert({
-      where: { userId },
-      update: {
-        stripeSubscriptionId: subscription.id,
-        stripePriceId: subscription.items.data[0]?.price?.id,
-        plan: 'PRO',
-        status: 'ACTIVE',
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      },
-      create: {
-        userId,
-        stripeSubscriptionId: subscription.id,
-        stripePriceId: subscription.items.data[0]?.price?.id,
-        plan: 'PRO',
-        status: 'ACTIVE',
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      },
-    });
-
-    this.logger.log(`Subscription activated for user ${userId}`);
-  }
-
-  private async handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-    const sub = subscription as any;
-    const subscriptionRecord = await this.prisma.subscription.findFirst({
-      where: { stripeSubscriptionId: sub.id },
-    });
-
-    if (!subscriptionRecord) return;
-
-    const newPriceId = sub.items.data[0]?.price?.id;
-    const priceChanged =
-      subscriptionRecord.stripePriceId &&
-      subscriptionRecord.stripePriceId !== newPriceId;
-
-    await this.prisma.subscription.update({
-      where: { id: subscriptionRecord.id },
-      data: {
-        stripePriceId: newPriceId,
-        status: this.mapStripeStatus(sub.status),
-        currentPeriodStart: new Date(sub.current_period_start * 1000),
-        currentPeriodEnd: new Date(sub.current_period_end * 1000),
-        cancelAtPeriodEnd: sub.cancel_at_period_end,
-        ...(priceChanged && { priceChangedAt: new Date() }),
-      },
-    });
-
-    if (priceChanged) {
-      this.logger.log(
-        `Price changed for user ${subscriptionRecord.userId}: ${subscriptionRecord.stripePriceId} → ${newPriceId}`,
-      );
-    }
-  }
-
-  private async handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-    const sub = subscription as any;
-    const subscriptionRecord = await this.prisma.subscription.findFirst({
-      where: { stripeSubscriptionId: sub.id },
-    });
-
-    if (!subscriptionRecord) return;
-
-    await this.prisma.subscription.update({
-      where: { id: subscriptionRecord.id },
       data: {
         plan: 'FREE',
-        status: 'ACTIVE',
-        stripeSubscriptionId: null,
-        stripePriceId: null,
-        currentPeriodStart: null,
-        currentPeriodEnd: null,
+        status: 'CANCELLED',
         cancelAtPeriodEnd: false,
       },
     });
 
-    this.logger.log(
-      `Subscription cancelled for user ${subscriptionRecord.userId}`,
-    );
+    this.logger.log(`Subscription cancelled for user ${userId}`);
+
+    return { message: 'Subscription cancelled' };
   }
 
-  private async handlePaymentFailed(invoice: Stripe.Invoice) {
-    const inv = invoice as any;
-    const subscriptionId = inv.subscription as string;
-    if (!subscriptionId) return;
-
-    const subscriptionRecord = await this.prisma.subscription.findFirst({
-      where: { stripeSubscriptionId: subscriptionId },
+  async reactivateSubscription(userId: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
     });
 
-    if (!subscriptionRecord) return;
+    if (!subscription?.pagarmeSubscriptionId) {
+      throw new Error('No subscription to reactivate');
+    }
 
+    // Reactivate in Pagar.me
+    await this.request('PATCH', `/subscriptions/${subscription.pagarmeSubscriptionId}`, {
+      status: 'active',
+    });
+
+    // Update DB
     await this.prisma.subscription.update({
-      where: { id: subscriptionRecord.id },
+      where: { userId },
+      data: {
+        plan: 'PRO',
+        status: 'ACTIVE',
+        cancelAtPeriodEnd: false,
+      },
+    });
+
+    this.logger.log(`Subscription reactivated for user ${userId}`);
+
+    return { message: 'Subscription reactivated' };
+  }
+
+  // ========== WEBHOOKS ==========
+
+  verifyWebhookSignature(body: any, signature: string): boolean {
+    const secret = this.config.get<string>('PAGARME_WEBHOOK_SECRET');
+    if (!secret) return true; // Skip verification if no secret configured
+
+    const hash = crypto
+      .createHmac('sha256', secret)
+      .update(JSON.stringify(body))
+      .digest('hex');
+
+    return hash === signature;
+  }
+
+  async handleWebhook(event: any) {
+    const { type, data } = event;
+
+    this.logger.log(`Webhook received: ${type}`);
+
+    try {
+      switch (type) {
+        case 'subscription_created':
+          await this.handleSubscriptionCreated(data);
+          break;
+        case 'subscription_updated':
+          await this.handleSubscriptionUpdated(data);
+          break;
+        case 'subscription_canceled':
+          await this.handleSubscriptionCanceled(data);
+          break;
+        case 'subscription_success':
+          await this.handleSubscriptionSuccess(data);
+          break;
+        case 'subscription_failed':
+          await this.handleSubscriptionFailed(data);
+          break;
+        case 'transaction_created':
+        case 'transaction_updated':
+          await this.handleTransaction(data);
+          break;
+        default:
+          this.logger.log(`Unhandled webhook type: ${type}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error processing webhook ${type}:`, error);
+    }
+  }
+
+  private async handleSubscriptionCreated(data: PagarMeSubscription) {
+    const userId = data.metadata?.userId;
+    if (!userId) return;
+
+    await this.prisma.subscription.upsert({
+      where: { userId },
+      update: {
+        pagarmeSubscriptionId: data.id,
+        plan: 'PRO',
+        status: 'ACTIVE',
+        currentPeriodStart: new Date(data.current_period_start),
+        currentPeriodEnd: new Date(data.current_period_end),
+      },
+      create: {
+        userId,
+        pagarmeSubscriptionId: data.id,
+        plan: 'PRO',
+        status: 'ACTIVE',
+        currentPeriodStart: new Date(data.current_period_start),
+        currentPeriodEnd: new Date(data.current_period_end),
+      },
+    });
+
+    this.logger.log(`Subscription created for user ${userId}`);
+  }
+
+  private async handleSubscriptionUpdated(data: PagarMeSubscription) {
+    const userId = data.metadata?.userId;
+    if (!userId) return;
+
+    const statusMap: Record<string, SubscriptionStatus> = {
+      active: SubscriptionStatus.ACTIVE,
+      canceled: SubscriptionStatus.CANCELLED,
+      past_due: SubscriptionStatus.PAST_DUE,
+      unpaid: SubscriptionStatus.UNPAID,
+    };
+
+    const newStatus: SubscriptionStatus = statusMap[data.status] || SubscriptionStatus.ACTIVE;
+
+    await this.prisma.subscription.updateMany({
+      where: { pagarmeSubscriptionId: data.id },
+      data: {
+        status: newStatus,
+        currentPeriodStart: new Date(data.current_period_start),
+        currentPeriodEnd: new Date(data.current_period_end),
+      },
+    });
+  }
+
+  private async handleSubscriptionCanceled(data: PagarMeSubscription) {
+    const userId = data.metadata?.userId;
+    if (!userId) return;
+
+    await this.prisma.subscription.updateMany({
+      where: { pagarmeSubscriptionId: data.id },
+      data: {
+        plan: 'FREE',
+        status: 'CANCELLED',
+        cancelAtPeriodEnd: false,
+      },
+    });
+
+    this.logger.log(`Subscription cancelled for user ${userId}`);
+  }
+
+  private async handleSubscriptionSuccess(data: PagarMeSubscription) {
+    const userId = data.metadata?.userId;
+    if (!userId) return;
+
+    await this.prisma.subscription.updateMany({
+      where: { pagarmeSubscriptionId: data.id },
+      data: {
+        status: 'ACTIVE',
+        currentPeriodStart: new Date(data.current_period_start),
+        currentPeriodEnd: new Date(data.current_period_end),
+      },
+    });
+  }
+
+  private async handleSubscriptionFailed(data: PagarMeSubscription) {
+    const userId = data.metadata?.userId;
+    if (!userId) return;
+
+    await this.prisma.subscription.updateMany({
+      where: { pagarmeSubscriptionId: data.id },
       data: { status: 'PAST_DUE' },
     });
   }
 
-  private mapStripeStatus(
-    status: string,
-  ): 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' | 'UNPAID' {
-    switch (status) {
-      case 'active':
-        return 'ACTIVE';
-      case 'past_due':
-        return 'PAST_DUE';
-      case 'canceled':
-        return 'CANCELLED';
-      case 'unpaid':
-        return 'UNPAID';
-      default:
-        return 'ACTIVE';
+  private async handleTransaction(data: PagarMeTransaction) {
+    const userId = data.metadata?.userId;
+    const type = data.metadata?.type;
+
+    if (!userId) return;
+
+    // Handle one-time payment
+    if (type === 'one_time' && data.status === 'paid') {
+      const expiresAt = new Date();
+      expiresAt.setMonth(expiresAt.getMonth() + 1);
+
+      await this.prisma.oneTimeAccess.upsert({
+        where: { userId },
+        update: {
+          expiresAt,
+          transactionId: data.id,
+        },
+        create: {
+          userId,
+          expiresAt,
+          transactionId: data.id,
+        },
+      });
+
+      // Grant PRO access
+      await this.prisma.subscription.upsert({
+        where: { userId },
+        update: { plan: 'PRO', status: 'ACTIVE' },
+        create: { userId, plan: 'PRO', status: 'ACTIVE' },
+      });
+
+      this.logger.log(`One-time access granted for user ${userId}, expires ${expiresAt}`);
     }
   }
 }
