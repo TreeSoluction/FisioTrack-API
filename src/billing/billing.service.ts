@@ -413,16 +413,28 @@ export class BillingService {
 
     if (!subscriptionRecord) return;
 
+    const newPriceId = sub.items.data[0]?.price?.id;
+    const priceChanged =
+      subscriptionRecord.stripePriceId &&
+      subscriptionRecord.stripePriceId !== newPriceId;
+
     await this.prisma.subscription.update({
       where: { id: subscriptionRecord.id },
       data: {
-        stripePriceId: sub.items.data[0]?.price?.id,
+        stripePriceId: newPriceId,
         status: this.mapStripeStatus(sub.status),
         currentPeriodStart: new Date(sub.current_period_start * 1000),
         currentPeriodEnd: new Date(sub.current_period_end * 1000),
         cancelAtPeriodEnd: sub.cancel_at_period_end,
+        ...(priceChanged && { priceChangedAt: new Date() }),
       },
     });
+
+    if (priceChanged) {
+      this.logger.log(
+        `Price changed for user ${subscriptionRecord.userId}: ${subscriptionRecord.stripePriceId} → ${newPriceId}`,
+      );
+    }
   }
 
   private async handleSubscriptionDeleted(subscription: Stripe.Subscription) {

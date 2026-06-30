@@ -29,6 +29,12 @@ export class AuthService {
     const consentStatus = await this.consentService.getConsentStatus(user.id);
     const plan = user.subscription?.plan || 'FREE';
 
+    // Check if price changed in last 30 days
+    const priceChanged =
+      !!user.subscription?.priceChangedAt &&
+      Date.now() - new Date(user.subscription.priceChangedAt).getTime() <
+        30 * 24 * 60 * 60 * 1000;
+
     const payload = {
       sub: user.id,
       email: user.email,
@@ -47,6 +53,7 @@ export class AuthService {
       },
       requiresConsent: !consentStatus.hasConsented,
       missingDocuments: consentStatus.missingDocuments,
+      priceChanged,
     };
   }
 
