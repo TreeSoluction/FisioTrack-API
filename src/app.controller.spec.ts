@@ -22,21 +22,42 @@ describe('AppController', () => {
     appController = app.get<AppController>(AppController);
   });
 
+  it('should be defined', () => {
+    expect(appController).toBeDefined();
+  });
+
   describe('health', () => {
-    it('should return status ok when DB is connected', async () => {
+    it('should return status ok with db connected when DB responds', async () => {
       prisma.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
 
       const result = await appController.health();
 
-      expect(result.status).toBe('ok');
-      expect(result.db).toBe('connected');
-      expect(result.timestamp).toBeDefined();
+      expect(result).toEqual({
+        status: 'ok',
+        db: 'connected',
+        timestamp: expect.any(String),
+      });
+      expect(prisma.$queryRaw).toHaveBeenCalled();
+    });
+
+    it('should return valid ISO timestamp', async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
+
+      const result = await appController.health();
+
+      expect(new Date(result.timestamp).toISOString()).toBe(result.timestamp);
     });
 
     it('should throw ServiceUnavailableException when DB is unreachable', async () => {
       prisma.$queryRaw.mockRejectedValue(new Error('Connection refused'));
 
       await expect(appController.health()).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('should throw ServiceUnavailableException when DB times out', async () => {
+      prisma.$queryRaw.mockRejectedValue(new Error('Query timeout'));
+
+      await expect(appController.health()).rejects.toThrow('Database unreachable');
     });
   });
 });

@@ -346,4 +346,119 @@ describe('BillingService', () => {
       expect(prisma.subscription.upsert).toHaveBeenCalled();
     });
   });
+
+  describe('reactivateSubscription', () => {
+    it('should reactivate subscription', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({
+        plan: 'FREE',
+        status: 'CANCELLED',
+        mpPreapprovalId: 'preapproval_123',
+      });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
+
+      const result = await service.reactivateSubscription('user1');
+
+      expect(result.message).toBe('Subscription reactivated');
+      expect(prisma.subscription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ plan: 'PRO', status: 'ACTIVE' }),
+        }),
+      );
+    });
+
+    it('should throw when no preapproval', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({
+        plan: 'FREE',
+        mpPreapprovalId: null,
+      });
+
+      await expect(service.reactivateSubscription('user1')).rejects.toThrow(
+        'No subscription to reactivate',
+      );
+    });
+  });
+
+  describe('checkPaymentStatus', () => {
+    it('should return payment status', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          results: [{
+            status: 'approved',
+            status_detail: 'accredited',
+            id: 12345,
+            transaction_amount: 19.90,
+            payment_method_id: 'credit_card',
+            date_approved: '2026-01-01T00:00:00.000-03:00',
+            date_created: '2026-01-01T00:00:00.000-03:00',
+          }],
+        }),
+      });
+
+      const result = await service.checkPaymentStatus('sub_user1_monthly');
+
+      expect(result.status).toBe('approved');
+      expect(result.paymentId).toBe(12345);
+    });
+
+    it('should return pending when no payments found', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ results: [] }),
+      });
+
+      const result = await service.checkPaymentStatus('nonexistent');
+
+      expect(result.status).toBe('pending');
+    });
+  });
+
+  describe('expireOneTimeAccess', () => {
+    it('should downgrade to FREE when one-time access expired', async () => {
+      prisma.oneTimeAccess.findUnique.mockResolvedValue({
+        expiresAt: new Date('2020-01-01'),
+      });
+      prisma.subscription.update.mockResolvedValue({});
+      prisma.oneTimeAccess.delete.mockResolvedValue({});
+
+      await service.expireOneTimeAccess('user1');
+
+      expect(prisma.subscription.update).toHaveBeenCalledWith({
+        where: { userId: 'user1' },
+        data: { plan: 'FREE' },
+      });
+      expect(prisma.oneTimeAccess.delete).toHaveBeenCalledWith({
+        where: { userId: 'user1' },
+      });
+    });
+
+    it('should do nothing when no one-time access exists', async () => {
+      prisma.oneTimeAccess.findUnique.mockResolvedValue(null);
+
+      await service.expireOneTimeAccess('user1');
+
+      expect(prisma.subscription.update).not.toHaveBeenCalled();
+    });
+
+    it('should do nothing when one-time access is still valid', async () => {
+      prisma.oneTimeAccess.findUnique.mockResolvedValue({
+        expiresAt: new Date(Date.now() + 86400000),
+      });
+
+      await service.expireOneTimeAccess('user1');
+
+      expect(prisma.subscription.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createPortalUrl', () => {
+    it('should return frontend settings URL', async () => {
+      const result = await service.createPortalUrl('user1');
+
+      expect(result.url).toContain('/settings');
+    });
+  });
 });
