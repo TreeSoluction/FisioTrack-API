@@ -1,9 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { decryptPatientFields } from '../common/encryption.util';
-
-const SENSITIVE_FIELDS = ['cpf', 'medicalHistory', 'address', 'phone', 'email'];
+import { SENSITIVE_FIELDS } from '../common/constants';
 
 @Injectable()
 export class UsersService {
@@ -48,6 +47,15 @@ export class UsersService {
 
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    if (dto.email && dto.email !== user.email) {
+      const existing = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
+      if (existing) {
+        throw new ConflictException('Email already in use');
+      }
     }
 
     return this.prisma.user.update({

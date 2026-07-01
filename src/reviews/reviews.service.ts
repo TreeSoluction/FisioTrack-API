@@ -16,6 +16,10 @@ export class ReviewsService {
       select: { createdAt: true },
     });
 
+    if (!user) {
+      throw new ForbiddenException('User not found');
+    }
+
     const review = await this.prisma.review.findUnique({
       where: { userId },
       select: { id: true, rating: true, dismissedAt: true, createdAt: true },
@@ -27,7 +31,7 @@ export class ReviewsService {
 
     const hasReviewed = !!review;
     const wasDismissed = review?.dismissedAt != null;
-    const daysSinceDismiss = wasDismissed
+    const daysSinceDismiss = wasDismissed && review?.dismissedAt
       ? Math.floor(
           (Date.now() - new Date(review.dismissedAt).getTime()) /
             (1000 * 60 * 60 * 24),
@@ -77,13 +81,20 @@ export class ReviewsService {
       });
     }
 
-    return this.prisma.review.create({
-      data: {
-        userId,
-        rating: dto.rating,
-        comment: dto.comment,
-      },
-    });
+    try {
+      return await this.prisma.review.create({
+        data: {
+          userId,
+          rating: dto.rating,
+          comment: dto.comment,
+        },
+      });
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        throw new ConflictException('You have already reviewed');
+      }
+      throw error;
+    }
   }
 
   async dismissReview(userId: string) {

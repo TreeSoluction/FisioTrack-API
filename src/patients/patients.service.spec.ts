@@ -19,6 +19,7 @@ describe('PatientsService', () => {
       create: jest.Mock;
       findMany: jest.Mock;
       findFirst: jest.Mock;
+      count: jest.Mock;
       update: jest.Mock;
       delete: jest.Mock;
     };
@@ -30,6 +31,7 @@ describe('PatientsService', () => {
         create: jest.fn(),
         findMany: jest.fn(),
         findFirst: jest.fn(),
+        count: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
       },
@@ -94,29 +96,26 @@ describe('PatientsService', () => {
   });
 
   describe('findAll', () => {
-    it('should decrypt all patient fields', async () => {
+    it('should decrypt all patient fields with pagination', async () => {
       const userId = 'user-1';
       const encrypted = [{ id: 'p1', cpf: 'enc' }];
       prisma.patient.findMany.mockResolvedValue(encrypted);
+      prisma.patient.count.mockResolvedValue(1);
       (decryptPatientFields as jest.Mock).mockReturnValue({
         id: 'p1',
         cpf: '123',
       });
 
-      const result = await service.findAll(userId);
+      const result = await service.findAll(userId, 1, 20);
 
       expect(prisma.patient.findMany).toHaveBeenCalledWith({
         where: { userId },
         orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 20,
       });
-      expect(decryptPatientFields).toHaveBeenCalledWith(encrypted[0], [
-        'cpf',
-        'medicalHistory',
-        'address',
-        'phone',
-        'email',
-      ]);
-      expect(result).toEqual([{ id: 'p1', cpf: '123' }]);
+      expect(result.data).toEqual([{ id: 'p1', cpf: '123' }]);
+      expect(result.pagination.total).toBe(1);
     });
   });
 

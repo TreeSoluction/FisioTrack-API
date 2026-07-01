@@ -15,7 +15,7 @@ export class ConsentGuard implements CanActivate {
     const user = request.user;
 
     if (!user) {
-      return true;
+      return false;
     }
 
     const status = await this.consentService.getConsentStatus(user.id);

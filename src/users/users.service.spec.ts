@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { decryptPatientFields } from '../common/encryption.util';
@@ -124,6 +124,32 @@ describe('UsersService', () => {
       await expect(
         service.updateProfile('user-1', { name: 'Updated' }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ConflictException when email already in use', async () => {
+      prisma.user.findUnique
+        .mockResolvedValueOnce(mockProfile)
+        .mockResolvedValueOnce({ id: 'other-user', email: 'taken@example.com' });
+
+      await expect(
+        service.updateProfile('user-1', { email: 'taken@example.com' }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should allow keeping same email', async () => {
+      prisma.user.findUnique.mockResolvedValue(mockProfile);
+      prisma.user.update.mockResolvedValue({
+        id: 'user-1',
+        name: 'Updated',
+        email: 'test@example.com',
+        role: 'THERAPIST',
+      });
+
+      const result = await service.updateProfile('user-1', {
+        email: 'test@example.com',
+      });
+
+      expect(result.email).toBe('test@example.com');
     });
   });
 

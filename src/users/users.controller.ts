@@ -10,11 +10,12 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AuthenticatedRequest } from '../common/types';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -25,19 +26,23 @@ export class UsersController {
 
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
-  async getProfile(@Req() req: any) {
+  @ApiResponse({ status: 200, description: 'User profile' })
+  async getProfile(@Req() req: AuthenticatedRequest) {
     return this.usersService.getProfile(req.user.id);
   }
 
   @Put('me')
   @ApiOperation({ summary: 'Update current user profile' })
-  async updateProfile(@Req() req: any, @Body() dto: UpdateUserDto) {
+  @ApiResponse({ status: 200, description: 'Profile updated' })
+  @ApiResponse({ status: 409, description: 'Email already in use' })
+  async updateProfile(@Req() req: AuthenticatedRequest, @Body() dto: UpdateUserDto) {
     return this.usersService.updateProfile(req.user.id, dto);
   }
 
   @Get('me/export')
   @ApiOperation({ summary: 'Export all user data (LGPD Art. 18)' })
-  async exportData(@Req() req: any, @Res() res: Response) {
+  @ApiResponse({ status: 200, description: 'JSON file with all user data' })
+  async exportData(@Req() req: AuthenticatedRequest, @Res() res: Response) {
     const data = await this.usersService.exportData(req.user.id);
     res.setHeader('Content-Type', 'application/json');
     res.setHeader(
@@ -50,7 +55,8 @@ export class UsersController {
   @Delete('me')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete account and all data (LGPD Art. 18)' })
-  async deleteAccount(@Req() req: any) {
+  @ApiResponse({ status: 200, description: 'Account deleted' })
+  async deleteAccount(@Req() req: AuthenticatedRequest) {
     return this.usersService.deleteAccount(req.user.id);
   }
 }

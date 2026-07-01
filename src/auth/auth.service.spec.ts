@@ -16,6 +16,9 @@ describe('AuthService', () => {
   let prisma: {
     user: { findUnique: jest.Mock; create: jest.Mock };
     subscription: { create: jest.Mock };
+    refreshToken: { create: jest.Mock; delete: jest.Mock; deleteMany: jest.Mock; findUnique: jest.Mock };
+    blacklistedToken: { create: jest.Mock; findUnique: jest.Mock };
+    $transaction: jest.Mock;
   };
   let jwtService: { sign: jest.Mock };
   let consentService: {
@@ -47,6 +50,17 @@ describe('AuthService', () => {
       subscription: {
         create: jest.fn(),
       },
+      refreshToken: {
+        create: jest.fn().mockResolvedValue({ token: 'refresh-token' }),
+        delete: jest.fn(),
+        deleteMany: jest.fn(),
+        findUnique: jest.fn(),
+      },
+      blacklistedToken: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
+      },
+      $transaction: jest.fn(),
     };
     jwtService = { sign: jest.fn().mockReturnValue('jwt-token') };
     consentService = {
@@ -101,6 +115,7 @@ describe('AuthService', () => {
       expect(jwtService.sign).toHaveBeenCalledWith({
         sub: 'user-1',
         email: 'maria@example.com',
+        name: 'Dr. Maria',
         role: 'FISIOTHERAPIST',
         plan: 'PRO',
       });
@@ -150,6 +165,12 @@ describe('AuthService', () => {
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-new');
       prisma.user.create.mockResolvedValue(newUser);
       prisma.subscription.create.mockResolvedValue({});
+      prisma.$transaction.mockImplementation(async (fn: any) => {
+        return fn({
+          user: prisma.user,
+          subscription: prisma.subscription,
+        });
+      });
     });
 
     it('creates user with hashed password', async () => {

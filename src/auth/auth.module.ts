@@ -6,12 +6,17 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { ConsentModule } from '../consent/consent.module';
 
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
+
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'secret-key-change-in-production',
-      signOptions: { expiresIn: '24h' },
+      secret: jwtSecret,
+      signOptions: { expiresIn: '15m' },
     }),
     ConsentModule,
   ],

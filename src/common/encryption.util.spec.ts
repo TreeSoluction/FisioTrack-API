@@ -122,7 +122,10 @@ describe('encryption.util', () => {
     it('should throw when ENCRYPTION_KEY is missing', () => {
       const original = process.env.ENCRYPTION_KEY;
       delete process.env.ENCRYPTION_KEY;
-      expect(() => encrypt('test')).toThrow(
+      // Reset cached key by re-importing
+      jest.resetModules();
+      const { encrypt: freshEncrypt } = require('./encryption.util');
+      expect(() => freshEncrypt('test')).toThrow(
         'ENCRYPTION_KEY env var must be a 32-byte hex string',
       );
       process.env.ENCRYPTION_KEY = original;
@@ -131,7 +134,9 @@ describe('encryption.util', () => {
     it('should throw when ENCRYPTION_KEY is too short', () => {
       const original = process.env.ENCRYPTION_KEY;
       process.env.ENCRYPTION_KEY = 'short';
-      expect(() => encrypt('test')).toThrow(
+      jest.resetModules();
+      const { encrypt: freshEncrypt } = require('./encryption.util');
+      expect(() => freshEncrypt('test')).toThrow(
         'ENCRYPTION_KEY env var must be a 32-byte hex string',
       );
       process.env.ENCRYPTION_KEY = original;

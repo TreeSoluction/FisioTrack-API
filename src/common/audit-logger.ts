@@ -3,20 +3,20 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
+  Logger,
 } from '@nestjs/common';
-import { Observable, tap } from 'rxjs';
+import { Observable, tap, catchError } from 'rxjs';
 
 @Injectable()
 export class AuditLogger implements NestInterceptor {
-  private readonly sensitivePaths = ['/patients', '/treatments', '/sessions'];
+  private readonly logger = new Logger(AuditLogger.name);
+  private readonly excludePaths = ['/health'];
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const { method, url, user } = request;
 
-    const isSensitive = this.sensitivePaths.some((p) => url.startsWith(p));
-
-    if (!isSensitive) {
+    if (this.excludePaths.some((p) => url.startsWith(p))) {
       return next.handle();
     }
 
@@ -25,16 +25,27 @@ export class AuditLogger implements NestInterceptor {
     return next.handle().pipe(
       tap(() => {
         const duration = Date.now() - start;
-        console.log(
+        this.logger.log(
           JSON.stringify({
-            audit: true,
             userId: user?.id || 'anonymous',
             method,
             url,
             duration,
-            timestamp: new Date().toISOString(),
           }),
         );
+      }),
+      catchError((error) => {
+        const duration = Date.now() - start;
+        this.logger.warn(
+          JSON.stringify({
+            userId: user?.id || 'anonymous',
+            method,
+            url,
+            duration,
+            error: error.message,
+          }),
+        );
+        throw error;
       }),
     );
   }

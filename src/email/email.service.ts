@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 @Injectable()
 export class EmailService {
   constructor(private mailer: MailerService) {}
@@ -10,7 +19,7 @@ export class EmailService {
       to,
       subject: 'Welcome to FisioTrack',
       html: `
-        <h1>Welcome, ${name}!</h1>
+        <h1>Welcome, ${escapeHtml(name)}!</h1>
         <p>Your account has been created successfully.</p>
         <p>You can now log in and start managing your patients.</p>
       `,
@@ -23,7 +32,7 @@ export class EmailService {
       subject: 'Appointment Reminder - FisioTrack',
       html: `
         <h1>Appointment Reminder</h1>
-        <p>You have an appointment with ${patientName} scheduled for ${date}.</p>
+        <p>You have an appointment with ${escapeHtml(patientName)} scheduled for ${escapeHtml(date)}.</p>
         <p>Please confirm or reschedule if needed.</p>
       `,
     });
@@ -39,10 +48,10 @@ export class EmailService {
       subject: `Session Summary - ${patientName} - FisioTrack`,
       html: `
         <h1>Session Summary</h1>
-        <p><strong>Patient:</strong> ${patientName}</p>
+        <p><strong>Patient:</strong> ${escapeHtml(patientName)}</p>
         <p><strong>Pain Scale:</strong> ${data.painScale}/10</p>
         ${data.weight ? `<p><strong>Weight:</strong> ${data.weight} kg</p>` : ''}
-        ${data.notes ? `<p><strong>Notes:</strong> ${data.notes}</p>` : ''}
+        ${data.notes ? `<p><strong>Notes:</strong> ${escapeHtml(data.notes)}</p>` : ''}
       `,
     });
   }
@@ -54,7 +63,7 @@ export class EmailService {
       html: `
         <h1>Payment Reminder</h1>
         <p>You have a pending payment of R$ ${value.toFixed(2)}.</p>
-        <p>Due date: ${dueDate}</p>
+        <p>Due date: ${escapeHtml(dueDate)}</p>
       `,
     });
   }

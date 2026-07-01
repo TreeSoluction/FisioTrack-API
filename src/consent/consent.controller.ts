@@ -9,11 +9,12 @@ import {
   Req,
   NotFoundException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { DocumentType } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ConsentService } from './consent.service';
 import { CreateConsentDto } from './dto/consent.dto';
+import { AuthenticatedRequest } from '../common/types';
 
 @ApiTags('consent')
 @ApiBearerAuth()
@@ -24,29 +25,31 @@ export class ConsentController {
 
   @Post()
   @ApiOperation({ summary: 'Record user consent' })
-  async recordConsent(@Req() req: any, @Body() dto: CreateConsentDto) {
-    const ipAddress = req.ip || req.headers['x-forwarded-for'];
-    return this.consentService.recordConsent(req.user.id, {
-      ...dto,
-      ipAddress,
-    });
+  @ApiResponse({ status: 201, description: 'Consent recorded' })
+  async recordConsent(@Req() req: AuthenticatedRequest, @Body() dto: CreateConsentDto) {
+    const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string);
+    return this.consentService.recordConsent(req.user.id, dto, ipAddress);
   }
 
   @Get('status')
   @ApiOperation({ summary: 'Get consent status' })
-  async getConsentStatus(@Req() req: any) {
+  @ApiResponse({ status: 200, description: 'Consent status with missing documents' })
+  async getConsentStatus(@Req() req: AuthenticatedRequest) {
     return this.consentService.getConsentStatus(req.user.id);
   }
 
   @Get('history')
   @ApiOperation({ summary: 'Get consent history' })
-  async getConsentHistory(@Req() req: any) {
+  @ApiResponse({ status: 200, description: 'List of consent records' })
+  async getConsentHistory(@Req() req: AuthenticatedRequest) {
     return this.consentService.getConsentHistory(req.user.id);
   }
 
   @Delete(':type')
   @ApiOperation({ summary: 'Revoke consent (LGPD Art. 18 VIII)' })
-  async revokeConsent(@Req() req: any, @Param('type') type: string) {
+  @ApiResponse({ status: 200, description: 'Consent revoked' })
+  @ApiResponse({ status: 404, description: 'Consent not found or already revoked' })
+  async revokeConsent(@Req() req: AuthenticatedRequest, @Param('type') type: string) {
     const documentType = type as DocumentType;
     if (!Object.values(DocumentType).includes(documentType)) {
       throw new NotFoundException('Invalid document type');

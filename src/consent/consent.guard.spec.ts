@@ -50,11 +50,11 @@ describe('ConsentGuard', () => {
       );
     });
 
-    it('should return true when no user in request (unauthenticated)', async () => {
+    it('should return false when no user in request (unauthenticated)', async () => {
       const context = createExecutionContext(undefined);
       const result = await guard.canActivate(context);
 
-      expect(result).toBe(true);
+      expect(result).toBe(false);
       expect(consentService.getConsentStatus).not.toHaveBeenCalled();
     });
   });

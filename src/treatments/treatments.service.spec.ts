@@ -29,6 +29,7 @@ describe('TreatmentsService', () => {
         findMany: jest.fn(),
         findFirst: jest.fn(),
         findUnique: jest.fn(),
+        count: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
       },
@@ -72,15 +73,19 @@ describe('TreatmentsService', () => {
   });
 
   describe('findAll', () => {
-    it('should return treatments with patient included', async () => {
+    it('should return treatments with patient included and pagination', async () => {
       prisma.treatment.findMany.mockResolvedValue([mockTreatment]);
+      prisma.treatment.count.mockResolvedValue(1);
 
-      const result = await service.findAll('user-1');
+      const result = await service.findAll('user-1', 1, 20);
 
-      expect(result).toEqual([mockTreatment]);
+      expect(result.data).toEqual([mockTreatment]);
+      expect(result.pagination.total).toBe(1);
       expect(prisma.treatment.findMany).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
         orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 20,
         include: { patient: true },
       });
     });

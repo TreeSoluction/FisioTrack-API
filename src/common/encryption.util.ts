@@ -3,6 +3,8 @@ import * as crypto from 'crypto';
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 
+let cachedKey: Buffer | null = null;
+
 export function isEncryptionEnabled(): boolean {
   const value = process.env.ENCRYPTION_ENABLED;
   if (value === undefined || value === '') return true;
@@ -10,13 +12,16 @@ export function isEncryptionEnabled(): boolean {
 }
 
 function getKey(): Buffer {
+  if (cachedKey) return cachedKey;
+
   const keyHex = process.env.ENCRYPTION_KEY;
   if (!keyHex || keyHex.length < 64) {
     throw new Error(
       'ENCRYPTION_KEY env var must be a 32-byte hex string (64 chars)',
     );
   }
-  return Buffer.from(keyHex, 'hex');
+  cachedKey = Buffer.from(keyHex, 'hex');
+  return cachedKey;
 }
 
 export function encrypt(text: string): string {

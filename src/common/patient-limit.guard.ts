@@ -15,7 +15,7 @@ export class PatientLimitGuard implements CanActivate {
     const user = request.user;
 
     if (!user) {
-      return true;
+      return false;
     }
 
     const subscription = await this.prisma.subscription.findUnique({
@@ -33,6 +33,10 @@ export class PatientLimitGuard implements CanActivate {
       where: { id: user.id },
       select: { maxPatients: true },
     });
+
+    if (!userData) {
+      return false;
+    }
 
     const patientCount = await this.prisma.patient.count({
       where: { userId: user.id },

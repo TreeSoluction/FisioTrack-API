@@ -23,6 +23,12 @@ function createPrismaMock() {
       upsert: jest.fn(),
       delete: jest.fn(),
     },
+    webhookEvent: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+    },
   };
 }
 
@@ -124,6 +130,7 @@ describe('BillingService', () => {
 
   describe('createSubscriptionCheckout', () => {
     it('should create checkout for monthly plan', async () => {
+      (service as any).monthlyPlanId = 'plan_monthly_123';
       prisma.subscription.findUnique.mockResolvedValue({
         mpCustomerId: 'cust_123',
       });
@@ -144,6 +151,7 @@ describe('BillingService', () => {
     });
 
     it('should create checkout for yearly plan', async () => {
+      (service as any).yearlyPlanId = 'plan_yearly_456';
       prisma.subscription.findUnique.mockResolvedValue({
         mpCustomerId: 'cust_123',
       });
@@ -212,7 +220,7 @@ describe('BillingService', () => {
       expect(result.isOneTime).toBe(true);
     });
 
-    it('should downgrade to FREE when one-time access expired', async () => {
+    it('should show FREE plan when one-time access expired (read-only)', async () => {
       prisma.subscription.findUnique.mockResolvedValue({
         plan: 'PRO',
         status: 'ACTIVE',
@@ -224,14 +232,15 @@ describe('BillingService', () => {
       const result = await service.getSubscriptionStatus('user1');
 
       expect(result.plan).toBe('FREE');
-      expect(prisma.subscription.update).toHaveBeenCalled();
-      expect(prisma.oneTimeAccess.delete).toHaveBeenCalled();
+      expect(result.isOneTime).toBe(false);
+      expect(prisma.subscription.update).not.toHaveBeenCalled();
     });
   });
 
   describe('cancelSubscription', () => {
     it('should cancel subscription', async () => {
       prisma.subscription.findUnique.mockResolvedValue({
+        plan: 'PRO',
         mpPreapprovalId: 'preapproval_123',
       });
       mockFetch.mockResolvedValue({
@@ -276,18 +285,22 @@ describe('BillingService', () => {
       expect(result).toBe(false);
     });
 
-    it('should return true when no secret configured', () => {
+    it('should return false when no secret configured', () => {
       const serviceNoSecret = new BillingService(
         createConfigMock({}),
         prisma as any,
       );
       const result = serviceNoSecret.verifyWebhookSignature({}, 'anything');
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
   });
 
   describe('handleWebhook', () => {
     it('should handle payment webhook for one-time', async () => {
+      prisma.webhookEvent.upsert.mockResolvedValue({
+        stripeEventId: 'payment_12345',
+        processed: false,
+      });
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({
@@ -310,6 +323,10 @@ describe('BillingService', () => {
     });
 
     it('should handle preapproval webhook', async () => {
+      prisma.webhookEvent.upsert.mockResolvedValue({
+        stripeEventId: 'preapproval_preapproval_123',
+        processed: false,
+      });
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({

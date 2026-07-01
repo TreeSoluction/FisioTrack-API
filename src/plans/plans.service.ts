@@ -94,7 +94,7 @@ export class PlansService {
       ...currentPlan,
       subscriptionStatus: subscription?.status || 'ACTIVE',
       patientCount,
-      maxPatients: user.maxPatients,
+      maxPatients: user?.maxPatients ?? 50,
     };
   }
 
@@ -121,10 +121,12 @@ export class PlansService {
       select: { maxPatients: true },
     });
 
+    const maxPatients = user?.maxPatients ?? 50;
+
     return {
-      allowed: patientCount < user.maxPatients,
+      allowed: patientCount < maxPatients,
       current: patientCount,
-      max: user.maxPatients,
+      max: maxPatients,
     };
   }
 }

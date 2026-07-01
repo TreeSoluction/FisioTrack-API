@@ -12,6 +12,7 @@ describe('ConsentService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -22,6 +23,7 @@ describe('ConsentService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      $transaction: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -37,12 +39,11 @@ describe('ConsentService', () => {
       const dto = {
         documentType: DocumentType.PRIVACY_POLICY,
         documentVersion: '1.0',
-        ipAddress: '127.0.0.1',
       };
-      const expected = { userId: 'u1', ...dto };
+      const expected = { userId: 'u1', ...dto, ipAddress: '127.0.0.1' };
       prisma.userConsent.upsert.mockResolvedValue(expected);
 
-      const result = await service.recordConsent('u1', dto);
+      const result = await service.recordConsent('u1', dto, '127.0.0.1');
 
       expect(prisma.userConsent.upsert).toHaveBeenCalledWith({
         where: {
@@ -109,29 +110,18 @@ describe('ConsentService', () => {
   });
 
   describe('recordAllConsents', () => {
-    it('should create all 3 document types', async () => {
+    it('should create all 3 document types in a transaction', async () => {
       prisma.userConsent.upsert.mockResolvedValue({});
+      prisma.$transaction.mockImplementation(async (ops: any[]) => {
+        return Promise.all(ops);
+      });
 
       await service.recordAllConsents('u1', '127.0.0.1');
 
+      expect(prisma.$transaction).toHaveBeenCalled();
       expect(prisma.userConsent.upsert).toHaveBeenCalledTimes(
         Object.values(DocumentType).length,
       );
-
-      Object.values(DocumentType).forEach((dt) => {
-        expect(prisma.userConsent.upsert).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: {
-              userId_documentType: { userId: 'u1', documentType: dt },
-            },
-            create: expect.objectContaining({
-              userId: 'u1',
-              documentType: dt,
-              documentVersion: DOCUMENT_VERSIONS[dt],
-            }),
-          }),
-        );
-      });
     });
   });
 

@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { DocumentType } from '@prisma/client';
 
@@ -10,9 +10,4 @@ export class CreateConsentDto {
   @ApiProperty()
   @IsString()
   documentVersion: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  ipAddress?: string;
 }

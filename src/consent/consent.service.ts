@@ -13,7 +13,7 @@ export const DOCUMENT_VERSIONS = {
 export class ConsentService {
   constructor(private prisma: PrismaService) {}
 
-  async recordConsent(userId: string, dto: CreateConsentDto) {
+  async recordConsent(userId: string, dto: CreateConsentDto, ipAddress?: string) {
     return this.prisma.userConsent.upsert({
       where: {
         userId_documentType: {
@@ -23,14 +23,14 @@ export class ConsentService {
       },
       update: {
         documentVersion: dto.documentVersion,
-        ipAddress: dto.ipAddress,
+        ipAddress,
         consentedAt: new Date(),
       },
       create: {
         userId,
         documentType: dto.documentType,
         documentVersion: dto.documentVersion,
-        ipAddress: dto.ipAddress,
+        ipAddress,
       },
     });
   }
@@ -69,22 +69,24 @@ export class ConsentService {
       ipAddress,
     }));
 
-    for (const consent of consents) {
-      await this.prisma.userConsent.upsert({
-        where: {
-          userId_documentType: {
-            userId: consent.userId,
-            documentType: consent.documentType,
+    await this.prisma.$transaction(
+      consents.map((consent) =>
+        this.prisma.userConsent.upsert({
+          where: {
+            userId_documentType: {
+              userId: consent.userId,
+              documentType: consent.documentType,
+            },
           },
-        },
-        update: {
-          documentVersion: consent.documentVersion,
-          ipAddress: consent.ipAddress,
-          consentedAt: new Date(),
-        },
-        create: consent,
-      });
-    }
+          update: {
+            documentVersion: consent.documentVersion,
+            ipAddress: consent.ipAddress,
+            consentedAt: new Date(),
+          },
+          create: consent,
+        }),
+      ),
+    );
   }
 
   async getConsentHistory(userId: string) {

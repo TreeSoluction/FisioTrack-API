@@ -6,8 +6,7 @@ import {
   encryptPatientFields,
   decryptPatientFields,
 } from '../common/encryption.util';
-
-const SENSITIVE_FIELDS = ['cpf', 'medicalHistory', 'address', 'phone', 'email'];
+import { SENSITIVE_FIELDS } from '../common/constants';
 
 @Injectable()
 export class PatientsService {
@@ -24,12 +23,28 @@ export class PatientsService {
     return decryptPatientFields(patient, SENSITIVE_FIELDS);
   }
 
-  async findAll(userId: string) {
-    const patients = await this.prisma.patient.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-    return patients.map((p) => decryptPatientFields(p, SENSITIVE_FIELDS));
+  async findAll(userId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+
+    const [patients, total] = await Promise.all([
+      this.prisma.patient.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.patient.count({ where: { userId } }),
+    ]);
+
+    return {
+      data: patients.map((p) => decryptPatientFields(p, SENSITIVE_FIELDS)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string, userId: string) {
@@ -51,15 +66,25 @@ export class PatientsService {
   async update(id: string, userId: string, data: UpdatePatientDto) {
     await this.findOne(id, userId);
     const encryptedData = encryptPatientFields(data, SENSITIVE_FIELDS);
-    const patient = await this.prisma.patient.update({
-      where: { id },
-      data: encryptedData,
-    });
-    return decryptPatientFields(patient, SENSITIVE_FIELDS);
+    try {
+      const patient = await this.prisma.patient.update({
+        where: { id },
+        data: encryptedData,
+      });
+      return decryptPatientFields(patient, SENSITIVE_FIELDS);
+    } catch (error: any) {
+      if (error.code === 'P2025') throw new NotFoundException('Patient not found');
+      throw error;
+    }
   }
 
   async remove(id: string, userId: string) {
     await this.findOne(id, userId);
-    return this.prisma.patient.delete({ where: { id } });
+    try {
+      return await this.prisma.patient.delete({ where: { id } });
+    } catch (error: any) {
+      if (error.code === 'P2025') throw new NotFoundException('Patient not found');
+      throw error;
+    }
   }
 }

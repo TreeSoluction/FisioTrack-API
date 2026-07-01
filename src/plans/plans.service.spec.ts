@@ -28,14 +28,14 @@ describe('PlansService', () => {
     it('should have maxPatients: 50 for FREE plan', () => {
       const plans = service.getAvailablePlans();
       const freePlan = plans.find((p) => p.id === 'FREE');
-      expect(freePlan.maxPatients).toBe(50);
+      expect(freePlan?.maxPatients).toBe(50);
     });
 
     it('should have maxPatients: null and popular: true for PRO plan', () => {
       const plans = service.getAvailablePlans();
       const proPlan = plans.find((p) => p.id === 'PRO');
-      expect(proPlan.maxPatients).toBeNull();
-      expect(proPlan.popular).toBe(true);
+      expect(proPlan?.maxPatients).toBeNull();
+      expect(proPlan?.popular).toBe(true);
     });
   });
 

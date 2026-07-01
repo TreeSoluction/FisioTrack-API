@@ -7,14 +7,19 @@ import {
   Body,
   Param,
   Req,
+  Query,
   UseGuards,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiQuery, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ConsentGuard } from '../consent/consent.guard';
+import { ParseCuidPipe } from '../common/pipes/parse-cuid.pipe';
 import { TreatmentsService } from './treatments.service';
 import { CreateTreatmentDto } from './dto/create-treatment.dto';
 import { UpdateTreatmentDto } from './dto/update-treatment.dto';
+import { AuthenticatedRequest } from '../common/types';
 
 @ApiTags('treatments')
 @ApiBearerAuth()
@@ -24,36 +29,60 @@ export class TreatmentsController {
   constructor(private readonly treatmentsService: TreatmentsService) {}
 
   @Post()
-  create(@Req() req: any, @Body() createTreatmentDto: CreateTreatmentDto) {
+  @ApiOperation({ summary: 'Create a new treatment' })
+  @ApiResponse({ status: 201, description: 'Treatment created' })
+  create(@Req() req: AuthenticatedRequest, @Body() createTreatmentDto: CreateTreatmentDto) {
     return this.treatmentsService.create(req.user.id, createTreatmentDto);
   }
 
   @Get()
-  findAll(@Req() req: any) {
-    return this.treatmentsService.findAll(req.user.id);
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string, @Req() req: any) {
-    return this.treatmentsService.findOne(id, req.user.id);
+  @ApiOperation({ summary: 'List treatments with pagination' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'List of treatments' })
+  findAll(
+    @Req() req: AuthenticatedRequest,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ) {
+    return this.treatmentsService.findAll(req.user.id, page, limit);
   }
 
   @Get('patient/:patientId')
-  findByPatient(@Param('patientId') patientId: string, @Req() req: any) {
+  @ApiOperation({ summary: 'List treatments by patient' })
+  @ApiResponse({ status: 200, description: 'List of treatments for patient' })
+  findByPatient(@Param('patientId', ParseCuidPipe) patientId: string, @Req() req: AuthenticatedRequest) {
     return this.treatmentsService.findByPatient(patientId, req.user.id);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Get treatment with sessions and payments' })
+  @ApiResponse({ status: 200, description: 'Treatment found' })
+  @ApiResponse({ status: 400, description: 'Invalid ID format' })
+  @ApiResponse({ status: 404, description: 'Treatment not found' })
+  findOne(@Param('id', ParseCuidPipe) id: string, @Req() req: AuthenticatedRequest) {
+    return this.treatmentsService.findOne(id, req.user.id);
+  }
+
   @Put(':id')
+  @ApiOperation({ summary: 'Update treatment' })
+  @ApiResponse({ status: 200, description: 'Treatment updated' })
+  @ApiResponse({ status: 400, description: 'Invalid ID format' })
+  @ApiResponse({ status: 404, description: 'Treatment not found' })
   update(
-    @Param('id') id: string,
-    @Req() req: any,
+    @Param('id', ParseCuidPipe) id: string,
+    @Req() req: AuthenticatedRequest,
     @Body() updateTreatmentDto: UpdateTreatmentDto,
   ) {
     return this.treatmentsService.update(id, req.user.id, updateTreatmentDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() req: any) {
+  @ApiOperation({ summary: 'Delete treatment' })
+  @ApiResponse({ status: 200, description: 'Treatment deleted' })
+  @ApiResponse({ status: 400, description: 'Invalid ID format' })
+  @ApiResponse({ status: 404, description: 'Treatment not found' })
+  remove(@Param('id', ParseCuidPipe) id: string, @Req() req: AuthenticatedRequest) {
     return this.treatmentsService.remove(id, req.user.id);
   }
 }

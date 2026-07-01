@@ -7,15 +7,20 @@ import {
   Body,
   Param,
   Req,
+  Query,
   UseGuards,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiQuery, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ConsentGuard } from '../consent/consent.guard';
 import { PatientLimitGuard } from '../common/patient-limit.guard';
+import { ParseCuidPipe } from '../common/pipes/parse-cuid.pipe';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
+import { AuthenticatedRequest } from '../common/types';
 
 @ApiTags('patients')
 @ApiBearerAuth()
@@ -26,31 +31,54 @@ export class PatientsController {
 
   @Post()
   @UseGuards(PatientLimitGuard)
-  create(@Req() req: any, @Body() createPatientDto: CreatePatientDto) {
+  @ApiOperation({ summary: 'Create a new patient' })
+  @ApiResponse({ status: 201, description: 'Patient created successfully' })
+  @ApiResponse({ status: 403, description: 'Patient limit reached' })
+  create(@Req() req: AuthenticatedRequest, @Body() createPatientDto: CreatePatientDto) {
     return this.patientsService.create(req.user.id, createPatientDto);
   }
 
   @Get()
-  findAll(@Req() req: any) {
-    return this.patientsService.findAll(req.user.id);
+  @ApiOperation({ summary: 'List all patients with pagination' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'List of patients' })
+  findAll(
+    @Req() req: AuthenticatedRequest,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ) {
+    return this.patientsService.findAll(req.user.id, page, limit);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Req() req: any) {
+  @ApiOperation({ summary: 'Get patient by ID with treatments and appointments' })
+  @ApiResponse({ status: 200, description: 'Patient found' })
+  @ApiResponse({ status: 400, description: 'Invalid ID format' })
+  @ApiResponse({ status: 404, description: 'Patient not found' })
+  findOne(@Param('id', ParseCuidPipe) id: string, @Req() req: AuthenticatedRequest) {
     return this.patientsService.findOne(id, req.user.id);
   }
 
   @Put(':id')
+  @ApiOperation({ summary: 'Update patient' })
+  @ApiResponse({ status: 200, description: 'Patient updated' })
+  @ApiResponse({ status: 400, description: 'Invalid ID format' })
+  @ApiResponse({ status: 404, description: 'Patient not found' })
   update(
-    @Param('id') id: string,
-    @Req() req: any,
+    @Param('id', ParseCuidPipe) id: string,
+    @Req() req: AuthenticatedRequest,
     @Body() updatePatientDto: UpdatePatientDto,
   ) {
     return this.patientsService.update(id, req.user.id, updatePatientDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() req: any) {
+  @ApiOperation({ summary: 'Delete patient' })
+  @ApiResponse({ status: 200, description: 'Patient deleted' })
+  @ApiResponse({ status: 400, description: 'Invalid ID format' })
+  @ApiResponse({ status: 404, description: 'Patient not found' })
+  remove(@Param('id', ParseCuidPipe) id: string, @Req() req: AuthenticatedRequest) {
     return this.patientsService.remove(id, req.user.id);
   }
 }

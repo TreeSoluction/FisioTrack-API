@@ -17,12 +17,29 @@ export class TreatmentsService {
     });
   }
 
-  async findAll(userId: string) {
-    return this.prisma.treatment.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      include: { patient: true },
-    });
+  async findAll(userId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+
+    const [treatments, total] = await Promise.all([
+      this.prisma.treatment.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: { patient: true },
+      }),
+      this.prisma.treatment.count({ where: { userId } }),
+    ]);
+
+    return {
+      data: treatments,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string, userId: string) {
@@ -47,14 +64,24 @@ export class TreatmentsService {
 
   async update(id: string, userId: string, data: UpdateTreatmentDto) {
     await this.findOne(id, userId);
-    return this.prisma.treatment.update({
-      where: { id },
-      data,
-    });
+    try {
+      return await this.prisma.treatment.update({
+        where: { id },
+        data,
+      });
+    } catch (error: any) {
+      if (error.code === 'P2025') throw new NotFoundException('Treatment not found');
+      throw error;
+    }
   }
 
   async remove(id: string, userId: string) {
     await this.findOne(id, userId);
-    return this.prisma.treatment.delete({ where: { id } });
+    try {
+      return await this.prisma.treatment.delete({ where: { id } });
+    } catch (error: any) {
+      if (error.code === 'P2025') throw new NotFoundException('Treatment not found');
+      throw error;
+    }
   }
 }

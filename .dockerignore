@@ -5,4 +5,16 @@ build
 .gitignore
 .env
 .env.local
+.env.*
 *.md
+.github
+.vscode
+.idea
+coverage
+test
+src
+tsconfig.json
+tsconfig.build.json
+nest-cli.json
+eslint.config.mjs
+.prettierrc

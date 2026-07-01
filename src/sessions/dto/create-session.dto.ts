@@ -1,4 +1,4 @@
-import { IsOptional, IsNumber, IsString, Min, Max } from 'class-validator';
+import { IsOptional, IsNumber, IsString, IsObject, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSessionDto {
@@ -15,6 +15,7 @@ export class CreateSessionDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsObject()
   measurements?: Record<string, any>;
 
   @ApiPropertyOptional()
