@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Param,
   Req,
   Res,
   UseGuards,
@@ -31,7 +32,7 @@ export class BillingController {
   @ApiOperation({ summary: 'Create subscription checkout (monthly/yearly)' })
   async createCheckout(
     @Req() req: any,
-    @Body() body: { plan: 'monthly' | 'yearly' },
+    @Body() body: { plan: string },
   ) {
     return this.billingService.createSubscriptionCheckout(
       req.user.id,
@@ -62,6 +63,23 @@ export class BillingController {
     return this.billingService.getSubscriptionStatus(req.user.id);
   }
 
+  @Post('portal')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Create billing portal URL' })
+  async createPortal(@Req() req: any) {
+    return this.billingService.createPortalUrl(req.user.id);
+  }
+
+  @Get('payment-status/:reference')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Check payment status by external reference' })
+  async checkPaymentStatus(@Param('reference') reference: string) {
+    return this.billingService.checkPaymentStatus(reference);
+  }
+
   @Post('cancel')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -81,9 +99,10 @@ export class BillingController {
   }
 
   @Post('webhook')
-  @ApiOperation({ summary: 'Pagar.me webhook handler' })
+  @ApiOperation({ summary: 'Mercado Pago webhook handler' })
   async handleWebhook(@Req() req: Request, @Res() res: Response) {
-    const signature = req.headers['x-pagarme-signature'] as string;
+    const signature = req.headers['x-hub-signature-256'] as string ||
+                      req.headers['x-pagarme-signature'] as string;
 
     if (!this.billingService.verifyWebhookSignature(req.body, signature)) {
       res.status(400).json({ error: 'Invalid signature' });

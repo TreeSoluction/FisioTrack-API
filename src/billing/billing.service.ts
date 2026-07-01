@@ -1,4 +1,4 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionStatus } from '@prisma/client';
@@ -19,13 +19,25 @@ interface MPPayment {
   transaction_amount: number;
   date_created: string;
   date_approved?: string;
+  payer?: { id: number };
+}
+
+interface MPPlan {
+  id: string;
+  amount: number;
+  frequency: number;
+  frequency_type: string;
+  name: string;
+  status: string;
 }
 
 @Injectable()
-export class BillingService {
+export class BillingService implements OnModuleInit {
   private logger = new Logger(BillingService.name);
   private accessToken: string;
   private apiUrl = 'https://api.mercadopago.com';
+  private monthlyPlanId: string | null = null;
+  private yearlyPlanId: string | null = null;
 
   constructor(
     private config: ConfigService,
@@ -34,6 +46,16 @@ export class BillingService {
     this.accessToken = this.config.get<string>('MP_ACCESS_TOKEN') || '';
     if (!this.accessToken) {
       this.logger.warn('MP_ACCESS_TOKEN not configured - billing disabled');
+    }
+  }
+
+  async onModuleInit() {
+    if (!this.accessToken) return;
+
+    try {
+      await this.ensurePlansExist();
+    } catch (error) {
+      this.logger.error('Failed to initialize billing plans:', error);
     }
   }
 
@@ -64,6 +86,70 @@ export class BillingService {
     }
 
     return response.json();
+  }
+
+  // ========== PLAN MANAGEMENT ==========
+
+  private async ensurePlansExist() {
+    this.logger.log('Checking Mercado Pago plans...');
+
+    // List existing plans
+    const existingPlans = await this.request('GET', '/preapproval_plan/search');
+    const plans = existingPlans.results || [];
+
+    // Find or create monthly plan
+    const monthlyPlan = plans.find(
+      (p: any) => p.auto_recurring?.frequency === 1 &&
+        p.auto_recurring?.frequency_type === 'months' &&
+        p.auto_recurring?.transaction_amount === 19.90,
+    );
+
+    if (monthlyPlan) {
+      this.monthlyPlanId = monthlyPlan.id;
+      this.logger.log(`Monthly plan found: ${this.monthlyPlanId}`);
+    } else {
+      const newPlan = await this.request('POST', '/preapproval_plan', {
+        reason: 'FisioTrack PRO - Assinatura Mensal',
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: 'months',
+          transaction_amount: 19.90,
+          currency_id: 'BRL',
+        },
+        payment_methods_allowed: ['credit_card', 'debit_card'],
+        back_url: `${this.config.get('FRONTEND_URL') || 'http://localhost'}/settings`,
+      });
+      this.monthlyPlanId = newPlan.id;
+      this.logger.log(`Monthly plan created: ${this.monthlyPlanId}`);
+    }
+
+    // Find or create yearly plan
+    const yearlyPlan = plans.find(
+      (p: any) => p.auto_recurring?.frequency === 12 &&
+        p.auto_recurring?.frequency_type === 'months' &&
+        p.auto_recurring?.transaction_amount === 190.00,
+    );
+
+    if (yearlyPlan) {
+      this.yearlyPlanId = yearlyPlan.id;
+      this.logger.log(`Yearly plan found: ${this.yearlyPlanId}`);
+    } else {
+      const newPlan = await this.request('POST', '/preapproval_plan', {
+        reason: 'FisioTrack PRO - Assinatura Anual',
+        auto_recurring: {
+          frequency: 12,
+          frequency_type: 'months',
+          transaction_amount: 190.00,
+          currency_id: 'BRL',
+        },
+        payment_methods_allowed: ['credit_card', 'debit_card'],
+        back_url: `${this.config.get('FRONTEND_URL') || 'http://localhost'}/settings`,
+      });
+      this.yearlyPlanId = newPlan.id;
+      this.logger.log(`Yearly plan created: ${this.yearlyPlanId}`);
+    }
+
+    this.logger.log(`Plans initialized - Monthly: ${this.monthlyPlanId}, Yearly: ${this.yearlyPlanId}`);
   }
 
   // ========== PRICING ==========
@@ -152,43 +238,52 @@ export class BillingService {
     userId: string,
     email: string,
     name: string,
-    plan: 'monthly' | 'yearly',
+    plan: string,
   ) {
     const customerId = await this.getOrCreateCustomer(userId, email, name);
     const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173';
     const apiUrl = this.config.get<string>('API_URL') || 'http://localhost:3000';
 
-    const amount = plan === 'monthly' ? 1990 : 19000;
-    const title = plan === 'monthly'
+    // Normalize plan: accept 'month'/'year' or 'monthly'/'yearly'
+    const normalizedPlan = plan === 'month' || plan === 'monthly' ? 'monthly' : 'yearly';
+    const planId = normalizedPlan === 'monthly' ? this.monthlyPlanId : this.yearlyPlanId;
+
+    if (!planId) {
+      throw new Error('Subscription plans not initialized. Please restart the server.');
+    }
+
+    const amount = normalizedPlan === 'monthly' ? 19.90 : 190.00;
+    const title = normalizedPlan === 'monthly'
       ? 'FisioTrack PRO - Assinatura Mensal'
       : 'FisioTrack PRO - Assinatura Anual';
 
-    // Create preference for subscription
+    // Create preference for subscription checkout
     const preference = await this.request('POST', '/checkout/preferences', {
       items: [
         {
-          id: `fisiotrack_${plan}`,
+          id: `fisiotrack_${normalizedPlan}`,
           title,
           quantity: 1,
-          unit_price: amount / 100,
+          unit_price: amount,
           currency_id: 'BRL',
         },
       ],
       payer: {
         email,
-        name,
+        first_name: name.split(' ')[0],
+        last_name: name.split(' ').slice(1).join(' ') || '',
       },
-      external_reference: `sub_${userId}_${plan}`,
+      external_reference: `sub_${userId}_${normalizedPlan}`,
       notification_url: `${apiUrl}/billing/webhook`,
       back_urls: {
         success: `${frontendUrl}/settings?payment=success`,
         failure: `${frontendUrl}/pricing?payment=failure`,
         pending: `${frontendUrl}/settings?payment=pending`,
       },
-      auto_return: 'approved',
       metadata: {
         userId,
-        plan,
+        plan: normalizedPlan,
+        plan_id: planId,
         type: 'subscription',
       },
     });
@@ -283,21 +378,54 @@ export class BillingService {
     };
   }
 
+  async checkPaymentStatus(externalReference: string) {
+    try {
+      // Search for payments with this external reference
+      const payments = await this.request('GET', `/v1/payments/search?external_reference=${externalReference}`);
+
+      if (!payments.results || payments.results.length === 0) {
+        return { status: 'pending', message: 'Pagamento não encontrado' };
+      }
+
+      const payment = payments.results[0];
+
+      return {
+        status: payment.status,
+        statusDetail: payment.status_detail,
+        paymentId: payment.id,
+        amount: payment.transaction_amount,
+        paymentType: payment.payment_method_id,
+        dateApproved: payment.date_approved,
+        dateCreated: payment.date_created,
+      };
+    } catch (error) {
+      this.logger.error('Error checking payment status:', error);
+      return { status: 'error', message: 'Erro ao verificar pagamento' };
+    }
+  }
+
   async cancelSubscription(userId: string) {
     const subscription = await this.prisma.subscription.findUnique({
       where: { userId },
     });
 
-    if (!subscription?.mpPreapprovalId) {
+    if (!subscription || subscription.plan !== 'PRO') {
       throw new Error('No active subscription to cancel');
     }
 
-    // Cancel preapproval in Mercado Pago
-    await this.request(
-      'PUT',
-      `/preapproval/${subscription.mpPreapprovalId}`,
-      { status: 'cancelled' },
-    );
+    // If there's a preapproval, cancel it in Mercado Pago
+    if (subscription.mpPreapprovalId) {
+      try {
+        await this.request(
+          'PUT',
+          `/preapproval/${subscription.mpPreapprovalId}`,
+          { status: 'cancelled' },
+        );
+      } catch (error) {
+        this.logger.error('Failed to cancel preapproval in Mercado Pago:', error);
+        // Continue with local cancellation even if MP fails
+      }
+    }
 
     // Update DB
     await this.prisma.subscription.update({
@@ -345,12 +473,21 @@ export class BillingService {
     return { message: 'Subscription reactivated' };
   }
 
+  async createPortalUrl(userId: string) {
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost';
+    // Mercado Pago doesn't have a portal like Stripe
+    // Redirect to settings page where user can manage subscription
+    return { url: `${frontendUrl}/settings` };
+  }
+
   // ========== WEBHOOKS ==========
 
   verifyWebhookSignature(body: any, signature: string): boolean {
     const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
     if (!secret) return true; // Skip verification if no secret configured
+    if (!signature) return true; // Skip if no signature provided (for testing)
 
+    // Mercado Pago uses x-signature header with HMAC-SHA256
     const hash = crypto
       .createHmac('sha256', secret)
       .update(JSON.stringify(body))
@@ -360,20 +497,23 @@ export class BillingService {
   }
 
   async handleWebhook(event: any) {
-    // Mercado Pago sends different webhook formats
-    // topic: "payment" or "preapproval"
-    const { topic, resource } = event;
+    // Mercado Pago sends: { action: "payment.created", type: "payment", data: { id: 123 } }
+    // Or legacy format: { topic: "payment", resource: "123" }
+    const topic = event.topic || event.type;
+    const resourceId = event.data?.id || event.resource;
 
-    this.logger.log(`Webhook received: topic=${topic}, resource=${resource}`);
+    this.logger.log(`Webhook received: type=${topic}, resourceId=${resourceId}`);
 
     try {
-      if (topic === 'payment') {
-        await this.handlePaymentWebhook(resource);
-      } else if (topic === 'preapproval') {
-        await this.handlePreapprovalWebhook(resource);
+      if (topic === 'payment' || topic === 'payment.created') {
+        await this.handlePaymentWebhook(String(resourceId));
+      } else if (topic === 'preapproval' || topic === 'preapproval.created') {
+        await this.handlePreapprovalWebhook(String(resourceId));
+      } else {
+        this.logger.log(`Unhandled webhook type: ${topic}`);
       }
     } catch (error) {
-      this.logger.error(`Error processing webhook topic=${topic}:`, error);
+      this.logger.error(`Error processing webhook type=${topic}:`, error);
     }
   }
 
@@ -418,6 +558,27 @@ export class BillingService {
       const parts = externalRef.split('_');
       const userId = parts[1];
       const plan = parts[2];
+      const planId = plan === 'monthly' ? this.monthlyPlanId : this.yearlyPlanId;
+
+      // Create preapproval for recurring payments
+      let preapprovalId = null;
+      if (planId) {
+        try {
+          const preapproval = await this.request('POST', '/preapproval', {
+            preapproval_plan_id: planId,
+            payer_id: payment.payer?.id,
+            reason: `FisioTrack PRO - ${plan === 'monthly' ? 'Mensal' : 'Anual'}`,
+            external_reference: `preapproval_${userId}_${plan}`,
+            back_url: `${this.config.get('FRONTEND_URL') || 'http://localhost'}/settings`,
+            notification_url: `${this.config.get('API_URL') || 'http://localhost:3000'}/billing/webhook`,
+            metadata: { userId, plan },
+          });
+          preapprovalId = preapproval.id;
+          this.logger.log(`Preapproval created for user ${userId}: ${preapprovalId}`);
+        } catch (error) {
+          this.logger.error(`Failed to create preapproval for user ${userId}:`, error);
+        }
+      }
 
       // Update subscription
       await this.prisma.subscription.upsert({
@@ -425,11 +586,17 @@ export class BillingService {
         update: {
           plan: 'PRO',
           status: 'ACTIVE',
+          mpPreapprovalId: preapprovalId,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
         },
         create: {
           userId,
           plan: 'PRO',
           status: 'ACTIVE',
+          mpPreapprovalId: preapprovalId,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         },
       });
 
