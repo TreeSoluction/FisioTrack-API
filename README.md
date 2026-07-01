@@ -1,98 +1,157 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# FisioTrack Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API backend para o sistema de gestão de fisioterapia FisioTrack.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Stack
 
-## Description
+- **Runtime:** Node.js 22
+- **Framework:** NestJS 11
+- **Database:** PostgreSQL + Prisma 6
+- **Auth:** JWT (15min) + Refresh Tokens (7 dias)
+- **Payments:** Mercado Pago
+- **Email:** Brevo (SMTP)
+- **Docs:** Swagger/OpenAPI
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Setup
 
 ```bash
-$ yarn install
+# Instalar dependências
+yarn install
+
+# Configurar variáveis de ambiente
+cp .env.example .env
+# Editar .env com suas credenciais
+
+# Gerar Prisma Client
+npx prisma generate
+
+# Rodar migrations
+npx prisma migrate dev
+
+# Iniciar em desenvolvimento
+yarn start:dev
 ```
 
-## Compile and run the project
+## Variáveis de Ambiente
+
+| Variável | Obrigatória | Descrição |
+|----------|-------------|-----------|
+| `DATABASE_URL` | Sim | URL de conexão com PostgreSQL |
+| `JWT_SECRET` | Sim | Segredo para assinar JWTs (mín. 32 chars) |
+| `ENCRYPTION_KEY` | Sim | Chave AES-256 em hex (64 chars) |
+| `MP_ACCESS_TOKEN` | Não | Token de acesso Mercado Pago |
+| `MP_WEBHOOK_SECRET` | Não | Segredo para verificar webhooks |
+| `SMTP_HOST` | Não | Host SMTP (Brevo) |
+| `CORS_ORIGINS` | Não | Origens permitidas (separadas por vírgula) |
+
+## Autenticação
+
+### Fluxo de Tokens
+
+```
+Login → access_token (15min) + refresh_token (7 dias)
+Refresh → novos tokens (deleta o anterior)
+Logout → invalida access token (blacklist) + deleta refresh tokens
+```
+
+### Endpoints de Auth
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| POST | `/auth/login` | Login (retorna access + refresh tokens) |
+| POST | `/auth/refresh` | Renovar access token |
+| POST | `/auth/logout` | Logout (invalida tokens) |
+| POST | `/auth/register` | Registrar novo usuário |
+
+### Headers Requeridos
+
+```
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+## Segurança
+
+- **Helmet** — Security headers (HSTS, CSP, X-Frame-Options)
+- **Rate Limiting** — 100 req/min global, 5 login/min, 3 register/min
+- **JWT Live Validation** — Token validado contra DB a cada request
+- **Token Blacklist** — Tokens revogados são rejeitados
+- **CUID Validation** — IDs de path params validados no formato CUID
+- **Env Validation** — App crasha no startup se vars obrigatórias faltarem
+- **Webhook Idempotência** — Webhooks duplicados são ignorados
+- **XSS Prevention** — Valores de usuário escapados em emails
+- **Encryption at Rest** — CPF, histórico médico, endereço criptografados com AES-256-GCM
+
+## Endpoints Principais
+
+### Patients
+- `GET /patients` — Listar (com paginação)
+- `POST /patients` — Criar
+- `GET /patients/:id` — Buscar por ID
+- `PUT /patients/:id` — Atualizar
+- `DELETE /patients/:id` — Remover
+
+### Treatments
+- `GET /treatments` — Listar (com paginação)
+- `POST /treatments` — Criar
+- `GET /treatments/patient/:patientId` — Listar por paciente
+- `GET /treatments/:id` — Buscar com sessões e pagamentos
+- `PUT /treatments/:id` — Atualizar
+- `DELETE /treatments/:id` — Remover
+
+### Sessions
+- `GET /sessions/treatment/:treatmentId` — Listar por tratamento
+- `POST /sessions/:treatmentId` — Criar
+- `GET /sessions/dashboard/:patientId` — Dashboard do paciente
+- `GET /sessions/:id` — Buscar por ID
+- `DELETE /sessions/:id` — Remover
+
+### Billing
+- `GET /billing/pricing` — Preços
+- `POST /billing/checkout` — Criar checkout (mensal/anual)
+- `POST /billing/checkout-onetime` — Pagamento avulso
+- `GET /billing/subscription` — Status da assinatura
+- `POST /billing/cancel` — Cancelar assinatura
+- `POST /billing/webhook` — Webhook Mercado Pago
+
+### Health
+- `GET /health` — Health check com verificação de DB
+
+## Testes
 
 ```bash
-# development
-$ yarn run start
+# Todos os testes
+yarn test
 
-# watch mode
-$ yarn run start:dev
-
-# production mode
-$ yarn run start:prod
+# Com coverage
+yarn test:cov
 ```
 
-## Run tests
+## Deploy
 
 ```bash
-# unit tests
-$ yarn run test
+# Build
+yarn build
 
-# e2e tests
-$ yarn run test:e2e
-
-# test coverage
-$ yarn run test:cov
+# Produção
+yarn start:prod
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Docker
 
 ```bash
-$ yarn install -g @nestjs/mau
-$ mau deploy
+# Build imagem
+docker build -t fisiotrack-backend .
+
+# Rodar
+docker run -p 3000:3000 --env-file .env fisiotrack-backend
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Documentação da API
 
-## Resources
+Em desenvolvimento, a documentação Swagger está disponível em:
+```
+http://localhost:3000/api
+```
 
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Em produção (`NODE_ENV=production`), o Swagger é desabilitado automaticamente.
