@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { BILLING_PLANS } from './constants';
+import { THIRTY_DAYS_MS } from '../common/constants';
 
 interface MPPreference {
   id: string;
@@ -531,10 +532,10 @@ export class BillingService implements OnModuleInit {
 
     // Atomic idempotency: upsert returns existing or creates new
     const record = await this.prisma.webhookEvent.upsert({
-      where: { stripeEventId: eventId },
+      where: { eventId: eventId },
       update: {},
       create: {
-        stripeEventId: eventId,
+        eventId: eventId,
         type: topic,
         processed: false,
       },
@@ -556,7 +557,7 @@ export class BillingService implements OnModuleInit {
       }
 
       await this.prisma.webhookEvent.update({
-        where: { stripeEventId: eventId },
+        where: { eventId: eventId },
         data: { processed: true },
       });
     } catch (error) {
@@ -635,7 +636,7 @@ export class BillingService implements OnModuleInit {
           status: 'ACTIVE',
           mpPreapprovalId: preapprovalId,
           currentPeriodStart: new Date(),
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+          currentPeriodEnd: new Date(Date.now() + THIRTY_DAYS_MS),
         },
         create: {
           userId,
@@ -643,7 +644,7 @@ export class BillingService implements OnModuleInit {
           status: 'ACTIVE',
           mpPreapprovalId: preapprovalId,
           currentPeriodStart: new Date(),
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          currentPeriodEnd: new Date(Date.now() + THIRTY_DAYS_MS),
         },
       });
 

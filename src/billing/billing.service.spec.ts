@@ -298,7 +298,7 @@ describe('BillingService', () => {
   describe('handleWebhook', () => {
     it('should handle payment webhook for one-time', async () => {
       prisma.webhookEvent.upsert.mockResolvedValue({
-        stripeEventId: 'payment_12345',
+        eventId: 'payment_12345',
         processed: false,
       });
       mockFetch.mockResolvedValue({
@@ -324,7 +324,7 @@ describe('BillingService', () => {
 
     it('should handle preapproval webhook', async () => {
       prisma.webhookEvent.upsert.mockResolvedValue({
-        stripeEventId: 'preapproval_preapproval_123',
+        eventId: 'preapproval_preapproval_123',
         processed: false,
       });
       mockFetch.mockResolvedValue({

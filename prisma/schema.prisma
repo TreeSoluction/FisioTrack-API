@@ -256,11 +256,11 @@ model OneTimeAccess {
 }
 
 model WebhookEvent {
-  id            String   @id @default(cuid())
-  stripeEventId String   @unique
-  type          String
-  processed     Boolean  @default(false)
-  createdAt     DateTime @default(now())
+  id        String   @id @default(cuid())
+  eventId   String   @unique
+  type      String
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   @@map("webhook_events")
 }

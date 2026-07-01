@@ -117,8 +117,8 @@ export class BillingController {
   @ApiResponse({ status: 200, description: 'Webhook processed' })
   @ApiResponse({ status: 400, description: 'Invalid signature' })
   async handleWebhook(@Req() req: Request, @Res() res: Response) {
-    const signature = req.headers['x-hub-signature-256'] as string ||
-                      req.headers['x-pagarme-signature'] as string;
+    const signature = req.headers['x-signature'] as string ||
+                      req.headers['x-hub-signature-256'] as string;
 
     if (!this.billingService.verifyWebhookSignature(req.body, signature)) {
       res.status(400).json({ error: 'Invalid signature' });

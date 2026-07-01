@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConsentService } from '../consent/consent.service';
+import { THIRTY_DAYS_MS } from '../common/constants';
 
 @Injectable()
 export class AuthService {
@@ -59,7 +60,7 @@ export class AuthService {
     const priceChanged =
       !!user.subscription?.priceChangedAt &&
       Date.now() - new Date(user.subscription.priceChangedAt).getTime() <
-        30 * 24 * 60 * 60 * 1000;
+        THIRTY_DAYS_MS;
 
     const payload = {
       sub: user.id,
