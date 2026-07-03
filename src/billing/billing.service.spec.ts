@@ -398,7 +398,7 @@ describe('BillingService', () => {
         }),
       });
 
-      const result = await service.checkPaymentStatus('sub_user1_monthly');
+      const result = await service.checkPaymentStatus('user1', 'user1_sub_monthly');
 
       expect(result.status).toBe('approved');
       expect(result.paymentId).toBe(12345);
@@ -410,7 +410,7 @@ describe('BillingService', () => {
         json: () => Promise.resolve({ results: [] }),
       });
 
-      const result = await service.checkPaymentStatus('nonexistent');
+      const result = await service.checkPaymentStatus('user1', 'user1_nonexistent');
 
       expect(result.status).toBe('pending');
     });

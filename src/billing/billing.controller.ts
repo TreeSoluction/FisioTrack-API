@@ -87,8 +87,8 @@ export class BillingController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Check payment status by external reference' })
   @ApiResponse({ status: 200, description: 'Payment status' })
-  async checkPaymentStatus(@Param('reference') reference: string) {
-    return this.billingService.checkPaymentStatus(reference);
+  async checkPaymentStatus(@Param('reference') reference: string, @Req() req: AuthenticatedRequest) {
+    return this.billingService.checkPaymentStatus(req.user.id, reference);
   }
 
   @Post('cancel')

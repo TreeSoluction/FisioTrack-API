@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -7,12 +7,25 @@ import { ConsentService } from '../consent/consent.service';
 import { THIRTY_DAYS_MS } from '../common/constants';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private consentService: ConsentService,
   ) {}
+
+  async onModuleInit() {
+    await this.cleanupExpiredTokens();
+    setInterval(() => this.cleanupExpiredTokens(), 60 * 60 * 1000);
+  }
+
+  private async cleanupExpiredTokens() {
+    const now = new Date();
+    await Promise.all([
+      this.prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: now } } }),
+      this.prisma.blacklistedToken.deleteMany({ where: { expiresAt: { lt: now } } }),
+    ]);
+  }
 
   private generateRefreshToken(): string {
     return crypto.randomBytes(40).toString('hex');

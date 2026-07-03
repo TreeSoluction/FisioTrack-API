@@ -13,6 +13,7 @@ import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthenticatedRequest } from '../common/types';
+import { LoginDto, RegisterDto, RefreshDto } from './dto/auth.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -26,7 +27,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
-  async login(@Body() body: { email: string; password: string }) {
+  async login(@Body() body: LoginDto) {
     return this.authService.login(body.email, body.password);
   }
 
@@ -36,7 +37,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Refresh access token using refresh token' })
   @ApiResponse({ status: 200, description: 'New tokens generated' })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
-  async refresh(@Body() body: { refresh_token: string }) {
+  async refresh(@Body() body: RefreshDto) {
     return this.authService.refreshTokens(body.refresh_token);
   }
 
@@ -59,7 +60,7 @@ export class AuthController {
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async register(
     @Req() req: Request,
-    @Body() body: { name: string; email: string; password: string },
+    @Body() body: RegisterDto,
   ) {
     const ip = req.ip || (req.headers['x-forwarded-for'] as string);
     return this.authService.register(body.name, body.email, body.password, ip);

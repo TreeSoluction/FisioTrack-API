@@ -404,7 +404,12 @@ export class BillingService implements OnModuleInit {
     }
   }
 
-  async checkPaymentStatus(externalReference: string) {
+  async checkPaymentStatus(userId: string, externalReference: string) {
+    // Verify the reference belongs to this user
+    if (!externalReference.startsWith(userId)) {
+      return { status: 'forbidden', message: 'Reference does not belong to this user' };
+    }
+
     try {
       // Search for payments with this external reference
       const payments = await this.request('GET', `/v1/payments/search?external_reference=${externalReference}`);
