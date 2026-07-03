@@ -90,4 +90,46 @@ export class TreatmentsService {
       throw error;
     }
   }
+
+  async exportHistory(userId: string, treatmentId: string, format: string) {
+    const treatment = await this.findOne(treatmentId, userId);
+
+    const sessions = await this.prisma.session.findMany({
+      where: { treatmentId },
+      orderBy: { date: 'desc' },
+    });
+
+    const metricDefinitions = await this.prisma.metricDefinition.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (format === 'csv') {
+      const metricHeaders = metricDefinitions.map((m) => m.name);
+      const headers = ['Data', 'Dor', 'Peso', ...metricHeaders, 'Notas'];
+
+      const rows = sessions.map((s) => {
+        const measurements = (s.measurements as Record<string, any>) || {};
+        const metricValues = metricDefinitions.map((m) => {
+          const entry = measurements[m.id];
+          return entry?.value ?? '';
+        });
+        return [
+          new Date(s.date).toLocaleDateString('pt-BR'),
+          s.painScale,
+          s.weight ?? '',
+          ...metricValues,
+          s.notes ?? '',
+        ];
+      });
+
+      const csvContent = [headers, ...rows]
+        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+      return { csv: csvContent, filename: `tratamento-${treatmentId}.csv` };
+    }
+
+    return { treatment, sessions, metricDefinitions };
+  }
 }

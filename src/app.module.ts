@@ -15,6 +15,7 @@ import { EnterpriseModule } from './enterprise/enterprise.module';
 import { UsersModule } from './users/users.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { BillingModule } from './billing/billing.module';
+import { MetricDefinitionsModule } from './metric-definitions/metric-definitions.module';
 import { validate } from './config/env.validation';
 
 @Module({
@@ -36,6 +37,7 @@ import { validate } from './config/env.validation';
     UsersModule,
     ReviewsModule,
     BillingModule,
+    MetricDefinitionsModule,
   ],
   controllers: [AppController],
   providers: [

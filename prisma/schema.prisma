@@ -25,6 +25,7 @@ model User {
   review            Review?
   subscription      Subscription?
   oneTimeAccess     OneTimeAccess?
+  metricDefinitions MetricDefinition[]
 
   @@map("users")
 }
@@ -283,4 +284,24 @@ model BlacklistedToken {
   createdAt DateTime @default(now())
 
   @@map("blacklisted_tokens")
+}
+
+enum MetricType {
+  NUMBER
+  TEXT
+}
+
+model MetricDefinition {
+  id        String     @id @default(cuid())
+  name      String
+  type      MetricType
+  unit      String?
+  min       Decimal?
+  max       Decimal?
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  createdAt DateTime   @default(now())
+
+  @@index([userId])
+  @@map("metric_definitions")
 }

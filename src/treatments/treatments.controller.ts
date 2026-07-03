@@ -77,6 +77,18 @@ export class TreatmentsController {
     return this.treatmentsService.update(id, req.user.id, updateTreatmentDto);
   }
 
+  @Get(':id/export')
+  @ApiOperation({ summary: 'Export treatment history as CSV or JSON' })
+  @ApiQuery({ name: 'format', required: false, enum: ['csv', 'json'] })
+  @ApiResponse({ status: 200, description: 'Export data' })
+  exportHistory(
+    @Param('id', ParseCuidPipe) id: string,
+    @Req() req: AuthenticatedRequest,
+    @Query('format') format: string,
+  ) {
+    return this.treatmentsService.exportHistory(req.user.id, id, format || 'csv');
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete treatment' })
   @ApiResponse({ status: 200, description: 'Treatment deleted' })

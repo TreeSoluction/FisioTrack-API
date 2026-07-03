@@ -60,6 +60,25 @@ export class PatientsController {
     return this.patientsService.findOne(id, req.user.id);
   }
 
+  @Get(':id/history')
+  @ApiOperation({ summary: 'Get patient session history with metric definitions' })
+  @ApiResponse({ status: 200, description: 'Patient history' })
+  getHistory(@Param('id', ParseCuidPipe) id: string, @Req() req: AuthenticatedRequest) {
+    return this.patientsService.getHistory(req.user.id, id);
+  }
+
+  @Get(':id/export')
+  @ApiOperation({ summary: 'Export patient history as CSV or JSON' })
+  @ApiQuery({ name: 'format', required: false, enum: ['csv', 'json'] })
+  @ApiResponse({ status: 200, description: 'Export data' })
+  exportHistory(
+    @Param('id', ParseCuidPipe) id: string,
+    @Req() req: AuthenticatedRequest,
+    @Query('format') format: string,
+  ) {
+    return this.patientsService.exportHistory(req.user.id, id, format || 'csv');
+  }
+
   @Put(':id')
   @ApiOperation({ summary: 'Update patient' })
   @ApiResponse({ status: 200, description: 'Patient updated' })

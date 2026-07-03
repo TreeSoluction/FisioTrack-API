@@ -85,4 +85,68 @@ export class PatientsService {
       throw error;
     }
   }
+
+  async getHistory(userId: string, patientId: string) {
+    const patient = await this.findOne(patientId, userId);
+
+    const treatments = await this.prisma.treatment.findMany({
+      where: { patientId, userId },
+      include: {
+        sessions: {
+          orderBy: { date: 'desc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const sessions = treatments.flatMap((t) =>
+      t.sessions.map((s) => ({
+        ...s,
+        treatment: { id: t.id, estimatedTime: t.estimatedTime },
+      })),
+    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const metricDefinitions = await this.prisma.metricDefinition.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return { patient, sessions, metricDefinitions };
+  }
+
+  async exportHistory(userId: string, patientId: string, format: string) {
+    const { patient, sessions, metricDefinitions } = await this.getHistory(userId, patientId);
+
+    if (format === 'csv') {
+      return this.generateCsv(patient, sessions, metricDefinitions);
+    }
+
+    return { patient, sessions, metricDefinitions };
+  }
+
+  private generateCsv(patient: any, sessions: any[], metricDefinitions: any[]) {
+    const metricHeaders = metricDefinitions.map((m) => m.name);
+    const headers = ['Data', 'Dor', 'Peso', ...metricHeaders, 'Notas'];
+
+    const rows = sessions.map((s) => {
+      const measurements = (s.measurements as Record<string, any>) || {};
+      const metricValues = metricDefinitions.map((m) => {
+        const entry = measurements[m.id];
+        return entry?.value ?? '';
+      });
+      return [
+        new Date(s.date).toLocaleDateString('pt-BR'),
+        s.painScale,
+        s.weight ?? '',
+        ...metricValues,
+        s.notes ?? '',
+      ];
+    });
+
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    return { csv: csvContent, filename: `historico-${patient.name.replace(/\s+/g, '-')}.csv` };
+  }
 }
