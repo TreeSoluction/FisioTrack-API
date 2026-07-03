@@ -55,6 +55,13 @@ export class SessionsController {
     return this.sessionsService.findAll(req.user.id, treatmentId, page, limit);
   }
 
+  @Get('summary')
+  @ApiOperation({ summary: 'Get user dashboard summary with stats' })
+  @ApiResponse({ status: 200, description: 'Dashboard summary data' })
+  getSummary(@Req() req: AuthenticatedRequest) {
+    return this.sessionsService.getSummary(req.user.id);
+  }
+
   @Get('dashboard/:patientId')
   @ApiOperation({ summary: 'Get patient dashboard with session stats' })
   @ApiResponse({ status: 200, description: 'Dashboard data' })
