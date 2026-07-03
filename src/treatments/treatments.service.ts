@@ -32,13 +32,11 @@ export class TreatmentsService {
     ]);
 
     return {
-      data: treatments,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      items: treatments,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     };
   }
 

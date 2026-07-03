@@ -37,13 +37,11 @@ export class PatientsService {
     ]);
 
     return {
-      data: patients.map((p) => decryptPatientFields(p, SENSITIVE_FIELDS)),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      items: patients.map((p) => decryptPatientFields(p, SENSITIVE_FIELDS)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     };
   }
 

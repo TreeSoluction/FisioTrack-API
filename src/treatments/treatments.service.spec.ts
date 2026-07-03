@@ -79,8 +79,8 @@ describe('TreatmentsService', () => {
 
       const result = await service.findAll('user-1', 1, 20);
 
-      expect(result.data).toEqual([mockTreatment]);
-      expect(result.pagination.total).toBe(1);
+      expect(result.items).toEqual([mockTreatment]);
+      expect(result.total).toBe(1);
       expect(prisma.treatment.findMany).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
         orderBy: { createdAt: 'desc' },

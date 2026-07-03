@@ -45,13 +45,11 @@ export class SessionsService {
     ]);
 
     return {
-      data: sessions,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      items: sessions,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     };
   }
 

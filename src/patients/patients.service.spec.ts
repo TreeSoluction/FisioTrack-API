@@ -114,8 +114,8 @@ describe('PatientsService', () => {
         skip: 0,
         take: 20,
       });
-      expect(result.data).toEqual([{ id: 'p1', cpf: '123' }]);
-      expect(result.pagination.total).toBe(1);
+      expect(result.items).toEqual([{ id: 'p1', cpf: '123' }]);
+      expect(result.total).toBe(1);
     });
   });
 

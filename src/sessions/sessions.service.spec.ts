@@ -111,8 +111,8 @@ describe('SessionsService', () => {
 
       const result = await service.findAll(mockUserId, 'treatment-1', 1, 20);
 
-      expect(result.data).toEqual([mockSession]);
-      expect(result.pagination.total).toBe(1);
+      expect(result.items).toEqual([mockSession]);
+      expect(result.total).toBe(1);
       expect(prisma.treatment.findFirst).toHaveBeenCalledWith({
         where: { id: 'treatment-1', userId: mockUserId },
       });
