@@ -2,13 +2,13 @@ name: Backend CI/CD
 
 on:
   push:
-    branches: [master]
+    branches: [master, dev]
   pull_request:
     branches: [master]
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: soluctiontree/soluctiontree:fisiotrack-backend
+  IMAGE_NAME: soluctiontree/soluctiontree-fisiotrack-backend
 
 jobs:
   test:
