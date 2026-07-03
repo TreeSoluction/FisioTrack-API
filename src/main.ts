@@ -1,7 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { execSync } from 'child_process';
 import * as express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -9,8 +8,6 @@ import { AuditLogger } from './common/audit-logger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
-  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
 
   app.use(helmet());
 
