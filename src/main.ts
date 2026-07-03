@@ -8,9 +8,9 @@ import { AppModule } from './app.module';
 import { AuditLogger } from './common/audit-logger';
 
 async function bootstrap() {
-  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
-
   const app = await NestFactory.create(AppModule);
+
+  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
 
   app.use(helmet());
 
