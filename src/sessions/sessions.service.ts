@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 
@@ -103,7 +107,14 @@ export class SessionsService {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    const [activePatients, activeTreatments, totalSessions, monthlyRevenue, sessionsByMonth, treatmentsByPatient] = await Promise.all([
+    const [
+      activePatients,
+      activeTreatments,
+      totalSessions,
+      monthlyRevenue,
+      sessionsByMonth,
+      treatmentsByPatient,
+    ] = await Promise.all([
       this.prisma.patient.count({ where: { userId, status: 'ACTIVE' } }),
       this.prisma.treatment.count({ where: { userId, status: 'IN_PROGRESS' } }),
       this.prisma.session.count({ where: { treatment: { userId } } }),
@@ -118,13 +129,29 @@ export class SessionsService {
       }),
       this.prisma.treatment.findMany({
         where: { userId, status: 'IN_PROGRESS' },
-        include: { patient: { select: { name: true } }, _count: { select: { sessions: true } } },
+        include: {
+          patient: { select: { name: true } },
+          _count: { select: { sessions: true } },
+        },
         orderBy: { createdAt: 'desc' },
         take: 6,
       }),
     ]);
 
-    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const monthNames = [
+      'Jan',
+      'Fev',
+      'Mar',
+      'Abr',
+      'Mai',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Set',
+      'Out',
+      'Nov',
+      'Dez',
+    ];
     const sessionsMap = new Map<string, number>();
     for (const s of sessionsByMonth) {
       const key = `${s.date.getFullYear()}-${s.date.getMonth()}`;

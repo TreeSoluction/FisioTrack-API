@@ -31,12 +31,13 @@ export class ReviewsService {
 
     const hasReviewed = !!review;
     const wasDismissed = review?.dismissedAt != null;
-    const daysSinceDismiss = wasDismissed && review?.dismissedAt
-      ? Math.floor(
-          (Date.now() - new Date(review.dismissedAt).getTime()) /
-            (1000 * 60 * 60 * 24),
-        )
-      : 0;
+    const daysSinceDismiss =
+      wasDismissed && review?.dismissedAt
+        ? Math.floor(
+            (Date.now() - new Date(review.dismissedAt).getTime()) /
+              (1000 * 60 * 60 * 24),
+          )
+        : 0;
 
     const canReview =
       !hasReviewed &&

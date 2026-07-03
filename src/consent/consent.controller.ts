@@ -9,7 +9,12 @@ import {
   Req,
   NotFoundException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { DocumentType } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ConsentService } from './consent.service';
@@ -26,14 +31,20 @@ export class ConsentController {
   @Post()
   @ApiOperation({ summary: 'Record user consent' })
   @ApiResponse({ status: 201, description: 'Consent recorded' })
-  async recordConsent(@Req() req: AuthenticatedRequest, @Body() dto: CreateConsentDto) {
+  async recordConsent(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateConsentDto,
+  ) {
     const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string);
     return this.consentService.recordConsent(req.user.id, dto, ipAddress);
   }
 
   @Get('status')
   @ApiOperation({ summary: 'Get consent status' })
-  @ApiResponse({ status: 200, description: 'Consent status with missing documents' })
+  @ApiResponse({
+    status: 200,
+    description: 'Consent status with missing documents',
+  })
   async getConsentStatus(@Req() req: AuthenticatedRequest) {
     return this.consentService.getConsentStatus(req.user.id);
   }
@@ -48,8 +59,14 @@ export class ConsentController {
   @Delete(':type')
   @ApiOperation({ summary: 'Revoke consent (LGPD Art. 18 VIII)' })
   @ApiResponse({ status: 200, description: 'Consent revoked' })
-  @ApiResponse({ status: 404, description: 'Consent not found or already revoked' })
-  async revokeConsent(@Req() req: AuthenticatedRequest, @Param('type') type: string) {
+  @ApiResponse({
+    status: 404,
+    description: 'Consent not found or already revoked',
+  })
+  async revokeConsent(
+    @Req() req: AuthenticatedRequest,
+    @Param('type') type: string,
+  ) {
     const documentType = type as DocumentType;
     if (!Object.values(DocumentType).includes(documentType)) {
       throw new NotFoundException('Invalid document type');

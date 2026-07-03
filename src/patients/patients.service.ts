@@ -71,7 +71,8 @@ export class PatientsService {
       });
       return decryptPatientFields(patient, SENSITIVE_FIELDS);
     } catch (error: any) {
-      if (error.code === 'P2025') throw new NotFoundException('Patient not found');
+      if (error.code === 'P2025')
+        throw new NotFoundException('Patient not found');
       throw error;
     }
   }
@@ -81,7 +82,8 @@ export class PatientsService {
     try {
       return await this.prisma.patient.delete({ where: { id } });
     } catch (error: any) {
-      if (error.code === 'P2025') throw new NotFoundException('Patient not found');
+      if (error.code === 'P2025')
+        throw new NotFoundException('Patient not found');
       throw error;
     }
   }
@@ -99,12 +101,14 @@ export class PatientsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    const sessions = treatments.flatMap((t) =>
-      t.sessions.map((s) => ({
-        ...s,
-        treatment: { id: t.id, estimatedTime: t.estimatedTime },
-      })),
-    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const sessions = treatments
+      .flatMap((t) =>
+        t.sessions.map((s) => ({
+          ...s,
+          treatment: { id: t.id, estimatedTime: t.estimatedTime },
+        })),
+      )
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     const metricDefinitions = await this.prisma.metricDefinition.findMany({
       where: { userId },
@@ -115,7 +119,10 @@ export class PatientsService {
   }
 
   async exportHistory(userId: string, patientId: string, format: string) {
-    const { patient, sessions, metricDefinitions } = await this.getHistory(userId, patientId);
+    const { patient, sessions, metricDefinitions } = await this.getHistory(
+      userId,
+      patientId,
+    );
 
     if (format === 'csv') {
       return this.generateCsv(patient, sessions, metricDefinitions);
@@ -144,9 +151,14 @@ export class PatientsService {
     });
 
     const csvContent = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','),
+      )
       .join('\n');
 
-    return { csv: csvContent, filename: `historico-${patient.name.replace(/\s+/g, '-')}.csv` };
+    return {
+      csv: csvContent,
+      filename: `historico-${patient.name.replace(/\s+/g, '-')}.csv`,
+    };
   }
 }

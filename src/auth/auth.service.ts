@@ -1,4 +1,10 @@
-import { Injectable, ConflictException, UnauthorizedException, ForbiddenException, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+  ForbiddenException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -22,8 +28,12 @@ export class AuthService implements OnModuleInit {
   private async cleanupExpiredTokens() {
     const now = new Date();
     await Promise.all([
-      this.prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: now } } }),
-      this.prisma.blacklistedToken.deleteMany({ where: { expiresAt: { lt: now } } }),
+      this.prisma.refreshToken.deleteMany({
+        where: { expiresAt: { lt: now } },
+      }),
+      this.prisma.blacklistedToken.deleteMany({
+        where: { expiresAt: { lt: now } },
+      }),
     ]);
   }
 
@@ -83,7 +93,10 @@ export class AuthService implements OnModuleInit {
       plan,
     };
 
-    const { accessToken, refreshToken } = await this.generateTokens(user.id, payload);
+    const { accessToken, refreshToken } = await this.generateTokens(
+      user.id,
+      payload,
+    );
 
     return {
       access_token: accessToken,
@@ -137,7 +150,8 @@ export class AuthService implements OnModuleInit {
       plan,
     };
 
-    const { accessToken, refreshToken: newRefreshToken } = await this.generateTokens(user.id, payload);
+    const { accessToken, refreshToken: newRefreshToken } =
+      await this.generateTokens(user.id, payload);
 
     return {
       access_token: accessToken,
@@ -147,7 +161,7 @@ export class AuthService implements OnModuleInit {
 
   async logout(userId: string, accessToken: string) {
     // Decode token to get expiration
-    const decoded = this.jwtService.decode(accessToken) as any;
+    const decoded = this.jwtService.decode(accessToken);
     if (decoded?.exp) {
       const expiresAt = new Date(decoded.exp * 1000);
 

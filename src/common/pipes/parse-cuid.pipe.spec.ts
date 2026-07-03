@@ -36,27 +36,39 @@ describe('ParseCuidPipe', () => {
     });
 
     it('should reject string with uppercase letters', () => {
-      expect(() => pipe.transform('Clx12345678901234567890ab')).toThrow(BadRequestException);
+      expect(() => pipe.transform('Clx12345678901234567890ab')).toThrow(
+        BadRequestException,
+      );
     });
 
     it('should reject string with special characters', () => {
-      expect(() => pipe.transform('clx12345678901234567890!b')).toThrow(BadRequestException);
+      expect(() => pipe.transform('clx12345678901234567890!b')).toThrow(
+        BadRequestException,
+      );
     });
 
     it('should reject string too short (24 chars)', () => {
-      expect(() => pipe.transform('clx12345678901234567890a')).toThrow(BadRequestException);
+      expect(() => pipe.transform('clx12345678901234567890a')).toThrow(
+        BadRequestException,
+      );
     });
 
     it('should reject string too long (26 chars)', () => {
-      expect(() => pipe.transform('clx12345678901234567890abc')).toThrow(BadRequestException);
+      expect(() => pipe.transform('clx12345678901234567890abc')).toThrow(
+        BadRequestException,
+      );
     });
 
     it('should reject UUID format', () => {
-      expect(() => pipe.transform('550e8400-e29b-41d4-a716-446655440000')).toThrow(BadRequestException);
+      expect(() =>
+        pipe.transform('550e8400-e29b-41d4-a716-446655440000'),
+      ).toThrow(BadRequestException);
     });
 
     it('should reject string with spaces', () => {
-      expect(() => pipe.transform('clx1 2345678901234567890a')).toThrow(BadRequestException);
+      expect(() => pipe.transform('clx1 2345678901234567890a')).toThrow(
+        BadRequestException,
+      );
     });
   });
 

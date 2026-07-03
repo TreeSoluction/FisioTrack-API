@@ -16,7 +16,12 @@ describe('AuthService', () => {
   let prisma: {
     user: { findUnique: jest.Mock; create: jest.Mock };
     subscription: { create: jest.Mock };
-    refreshToken: { create: jest.Mock; delete: jest.Mock; deleteMany: jest.Mock; findUnique: jest.Mock };
+    refreshToken: {
+      create: jest.Mock;
+      delete: jest.Mock;
+      deleteMany: jest.Mock;
+      findUnique: jest.Mock;
+    };
     blacklistedToken: { create: jest.Mock; findUnique: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -62,7 +67,10 @@ describe('AuthService', () => {
       },
       $transaction: jest.fn(),
     };
-    jwtService = { sign: jest.fn().mockReturnValue('jwt-token'), decode: jest.fn() };
+    jwtService = {
+      sign: jest.fn().mockReturnValue('jwt-token'),
+      decode: jest.fn(),
+    };
     consentService = {
       getConsentStatus: jest.fn().mockResolvedValue(mockConsentStatus),
       recordAllConsents: jest.fn(),
@@ -299,7 +307,9 @@ describe('AuthService', () => {
 
   describe('logout', () => {
     it('should blacklist token and delete refresh tokens', async () => {
-      jwtService.decode.mockReturnValue({ exp: Math.floor(Date.now() / 1000) + 900 });
+      jwtService.decode.mockReturnValue({
+        exp: Math.floor(Date.now() / 1000) + 900,
+      });
       prisma.blacklistedToken.create.mockResolvedValue({});
       prisma.refreshToken.deleteMany.mockResolvedValue({ count: 2 });
 

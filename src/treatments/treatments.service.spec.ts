@@ -60,7 +60,10 @@ describe('TreatmentsService', () => {
         exercises: 'Alongamento',
         value: 150,
       };
-      prisma.patient.findFirst.mockResolvedValue({ id: 'patient-1', userId: 'user-1' });
+      prisma.patient.findFirst.mockResolvedValue({
+        id: 'patient-1',
+        userId: 'user-1',
+      });
       prisma.treatment.create.mockResolvedValue(mockTreatment);
 
       const result = await service.create('user-1', createDto);

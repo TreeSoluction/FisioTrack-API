@@ -11,7 +11,13 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiQuery, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ConsentGuard } from '../consent/consent.guard';
 import { ParseCuidPipe } from '../common/pipes/parse-cuid.pipe';
@@ -36,7 +42,11 @@ export class SessionsController {
     @Param('treatmentId', ParseCuidPipe) treatmentId: string,
     @Body() createSessionDto: CreateSessionDto,
   ) {
-    return this.sessionsService.create(req.user.id, treatmentId, createSessionDto);
+    return this.sessionsService.create(
+      req.user.id,
+      treatmentId,
+      createSessionDto,
+    );
   }
 
   @Get('treatment/:treatmentId')
@@ -67,7 +77,10 @@ export class SessionsController {
   @ApiResponse({ status: 200, description: 'Dashboard data' })
   @ApiResponse({ status: 400, description: 'Invalid ID format' })
   @ApiResponse({ status: 404, description: 'Patient not found' })
-  getDashboard(@Req() req: AuthenticatedRequest, @Param('patientId', ParseCuidPipe) patientId: string) {
+  getDashboard(
+    @Req() req: AuthenticatedRequest,
+    @Param('patientId', ParseCuidPipe) patientId: string,
+  ) {
     return this.sessionsService.getDashboard(req.user.id, patientId);
   }
 
@@ -77,7 +90,10 @@ export class SessionsController {
   @ApiResponse({ status: 400, description: 'Invalid ID format' })
   @ApiResponse({ status: 403, description: 'Access denied' })
   @ApiResponse({ status: 404, description: 'Session not found' })
-  findOne(@Req() req: AuthenticatedRequest, @Param('id', ParseCuidPipe) id: string) {
+  findOne(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseCuidPipe) id: string,
+  ) {
     return this.sessionsService.findOne(req.user.id, id);
   }
 
@@ -87,7 +103,10 @@ export class SessionsController {
   @ApiResponse({ status: 400, description: 'Invalid ID format' })
   @ApiResponse({ status: 403, description: 'Access denied' })
   @ApiResponse({ status: 404, description: 'Session not found' })
-  remove(@Req() req: AuthenticatedRequest, @Param('id', ParseCuidPipe) id: string) {
+  remove(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseCuidPipe) id: string,
+  ) {
     return this.sessionsService.remove(req.user.id, id);
   }
 }

@@ -14,9 +14,7 @@ describe('AppController', () => {
 
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [{ provide: PrismaService, useValue: prisma }],
     }).compile();
 
     appController = app.get<AppController>(AppController);
@@ -51,13 +49,17 @@ describe('AppController', () => {
     it('should throw ServiceUnavailableException when DB is unreachable', async () => {
       prisma.$queryRaw.mockRejectedValue(new Error('Connection refused'));
 
-      await expect(appController.health()).rejects.toThrow(ServiceUnavailableException);
+      await expect(appController.health()).rejects.toThrow(
+        ServiceUnavailableException,
+      );
     });
 
     it('should throw ServiceUnavailableException when DB times out', async () => {
       prisma.$queryRaw.mockRejectedValue(new Error('Query timeout'));
 
-      await expect(appController.health()).rejects.toThrow('Database unreachable');
+      await expect(appController.health()).rejects.toThrow(
+        'Database unreachable',
+      );
     });
   });
 });

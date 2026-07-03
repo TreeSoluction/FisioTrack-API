@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTreatmentDto } from './dto/create-treatment.dto';
 import { UpdateTreatmentDto } from './dto/update-treatment.dto';
@@ -76,7 +80,8 @@ export class TreatmentsService {
         data,
       });
     } catch (error: any) {
-      if (error.code === 'P2025') throw new NotFoundException('Treatment not found');
+      if (error.code === 'P2025')
+        throw new NotFoundException('Treatment not found');
       throw error;
     }
   }
@@ -86,7 +91,8 @@ export class TreatmentsService {
     try {
       return await this.prisma.treatment.delete({ where: { id } });
     } catch (error: any) {
-      if (error.code === 'P2025') throw new NotFoundException('Treatment not found');
+      if (error.code === 'P2025')
+        throw new NotFoundException('Treatment not found');
       throw error;
     }
   }
@@ -124,7 +130,9 @@ export class TreatmentsService {
       });
 
       const csvContent = [headers, ...rows]
-        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .map((row) =>
+          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','),
+        )
         .join('\n');
 
       return { csv: csvContent, filename: `tratamento-${treatmentId}.csv` };

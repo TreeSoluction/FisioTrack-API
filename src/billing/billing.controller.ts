@@ -11,7 +11,12 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BillingService } from './billing.service';
@@ -87,7 +92,10 @@ export class BillingController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Check payment status by external reference' })
   @ApiResponse({ status: 200, description: 'Payment status' })
-  async checkPaymentStatus(@Param('reference') reference: string, @Req() req: AuthenticatedRequest) {
+  async checkPaymentStatus(
+    @Param('reference') reference: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.billingService.checkPaymentStatus(req.user.id, reference);
   }
 
@@ -117,8 +125,9 @@ export class BillingController {
   @ApiResponse({ status: 200, description: 'Webhook processed' })
   @ApiResponse({ status: 400, description: 'Invalid signature' })
   async handleWebhook(@Req() req: Request, @Res() res: Response) {
-    const signature = req.headers['x-signature'] as string ||
-                      req.headers['x-hub-signature-256'] as string;
+    const signature =
+      (req.headers['x-signature'] as string) ||
+      (req.headers['x-hub-signature-256'] as string);
 
     if (!this.billingService.verifyWebhookSignature(req.body, signature)) {
       res.status(400).json({ error: 'Invalid signature' });

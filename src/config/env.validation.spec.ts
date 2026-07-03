@@ -29,47 +29,59 @@ describe('Environment Validation', () => {
 
   describe('missing required vars', () => {
     it('should throw when DATABASE_URL is missing', () => {
-      expect(() => validate({
-        JWT_SECRET: 'a'.repeat(32),
-        ENCRYPTION_KEY: 'a'.repeat(64),
-      })).toThrow('DATABASE_URL');
+      expect(() =>
+        validate({
+          JWT_SECRET: 'a'.repeat(32),
+          ENCRYPTION_KEY: 'a'.repeat(64),
+        }),
+      ).toThrow('DATABASE_URL');
     });
 
     it('should throw when JWT_SECRET is missing', () => {
-      expect(() => validate({
-        DATABASE_URL: 'postgresql://localhost/db',
-        ENCRYPTION_KEY: 'a'.repeat(64),
-      })).toThrow('JWT_SECRET');
+      expect(() =>
+        validate({
+          DATABASE_URL: 'postgresql://localhost/db',
+          ENCRYPTION_KEY: 'a'.repeat(64),
+        }),
+      ).toThrow('JWT_SECRET');
     });
 
     it('should throw when ENCRYPTION_KEY is missing', () => {
-      expect(() => validate({
-        DATABASE_URL: 'postgresql://localhost/db',
-        JWT_SECRET: 'a'.repeat(32),
-      })).toThrow('ENCRYPTION_KEY');
+      expect(() =>
+        validate({
+          DATABASE_URL: 'postgresql://localhost/db',
+          JWT_SECRET: 'a'.repeat(32),
+        }),
+      ).toThrow('ENCRYPTION_KEY');
     });
   });
 
   describe('invalid formats', () => {
     it('should throw when JWT_SECRET is too short', () => {
-      expect(() => validate({
-        ...validEnv,
-        JWT_SECRET: 'short',
-      })).toThrow('at least 32 characters');
+      expect(() =>
+        validate({
+          ...validEnv,
+          JWT_SECRET: 'short',
+        }),
+      ).toThrow('at least 32 characters');
     });
 
     it('should throw when ENCRYPTION_KEY is not 64 hex chars', () => {
-      expect(() => validate({
-        ...validEnv,
-        ENCRYPTION_KEY: 'not-hex',
-      })).toThrow('64-character hex string');
+      expect(() =>
+        validate({
+          ...validEnv,
+          ENCRYPTION_KEY: 'not-hex',
+        }),
+      ).toThrow('64-character hex string');
     });
 
     it('should throw when ENCRYPTION_KEY has uppercase hex', () => {
-      expect(() => validate({
-        ...validEnv,
-        ENCRYPTION_KEY: 'A'.repeat(64),
-      })).toThrow('64-character hex string');
+      expect(() =>
+        validate({
+          ...validEnv,
+          ENCRYPTION_KEY: 'A'.repeat(64),
+        }),
+      ).toThrow('64-character hex string');
     });
   });
 });

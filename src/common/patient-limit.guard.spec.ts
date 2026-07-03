@@ -70,7 +70,9 @@ describe('PatientLimitGuard', () => {
       prisma.patient.count.mockResolvedValue(50);
       const context = createExecutionContext({ id: 'user1' });
 
-      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
+      await expect(guard.canActivate(context)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should return false when user not found in DB', async () => {

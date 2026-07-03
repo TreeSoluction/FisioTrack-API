@@ -1,5 +1,10 @@
 import { Controller, Get, Post, Body, Req, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -14,7 +19,10 @@ export class ReviewsController {
 
   @Get('status')
   @ApiOperation({ summary: 'Get review eligibility status' })
-  @ApiResponse({ status: 200, description: 'Review status with eligibility info' })
+  @ApiResponse({
+    status: 200,
+    description: 'Review status with eligibility info',
+  })
   async getStatus(@Req() req: AuthenticatedRequest) {
     return this.reviewsService.getStatus(req.user.id);
   }
@@ -24,7 +32,10 @@ export class ReviewsController {
   @ApiResponse({ status: 201, description: 'Review submitted' })
   @ApiResponse({ status: 409, description: 'Already reviewed' })
   @ApiResponse({ status: 403, description: 'Cannot review yet' })
-  async createReview(@Req() req: AuthenticatedRequest, @Body() dto: CreateReviewDto) {
+  async createReview(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateReviewDto,
+  ) {
     return this.reviewsService.createReview(req.user.id, dto);
   }
 

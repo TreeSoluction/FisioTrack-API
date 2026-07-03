@@ -127,9 +127,9 @@ describe('SessionsService', () => {
     it('should throw NotFoundException when treatment not found', async () => {
       prisma.treatment.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findAll(mockUserId, 'treatment-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findAll(mockUserId, 'treatment-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -161,15 +161,18 @@ describe('SessionsService', () => {
       };
       prisma.session.findUnique.mockResolvedValue(otherUserTreatment);
 
-      await expect(
-        service.findOne(mockUserId, 'session-1'),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.findOne(mockUserId, 'session-1')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
   describe('getDashboard', () => {
     it('should verify patient ownership before returning dashboard', async () => {
-      prisma.patient.findFirst.mockResolvedValue({ id: 'patient-1', userId: mockUserId });
+      prisma.patient.findFirst.mockResolvedValue({
+        id: 'patient-1',
+        userId: mockUserId,
+      });
       prisma.treatment.count.mockResolvedValue(2);
       prisma.session.count.mockResolvedValue(1);
       prisma.session.findMany.mockResolvedValue([mockSession]);
@@ -193,7 +196,10 @@ describe('SessionsService', () => {
     });
 
     it('should return empty data when no data', async () => {
-      prisma.patient.findFirst.mockResolvedValue({ id: 'patient-1', userId: mockUserId });
+      prisma.patient.findFirst.mockResolvedValue({
+        id: 'patient-1',
+        userId: mockUserId,
+      });
       prisma.treatment.count.mockResolvedValue(0);
       prisma.session.count.mockResolvedValue(0);
       prisma.session.findMany.mockResolvedValue([]);

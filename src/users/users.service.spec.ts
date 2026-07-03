@@ -129,7 +129,10 @@ describe('UsersService', () => {
     it('should throw ConflictException when email already in use', async () => {
       prisma.user.findUnique
         .mockResolvedValueOnce(mockProfile)
-        .mockResolvedValueOnce({ id: 'other-user', email: 'taken@example.com' });
+        .mockResolvedValueOnce({
+          id: 'other-user',
+          email: 'taken@example.com',
+        });
 
       await expect(
         service.updateProfile('user-1', { email: 'taken@example.com' }),

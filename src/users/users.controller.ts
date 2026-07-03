@@ -10,7 +10,12 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
@@ -35,7 +40,10 @@ export class UsersController {
   @ApiOperation({ summary: 'Update current user profile' })
   @ApiResponse({ status: 200, description: 'Profile updated' })
   @ApiResponse({ status: 409, description: 'Email already in use' })
-  async updateProfile(@Req() req: AuthenticatedRequest, @Body() dto: UpdateUserDto) {
+  async updateProfile(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: UpdateUserDto,
+  ) {
     return this.usersService.updateProfile(req.user.id, dto);
   }
 

@@ -12,7 +12,13 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiQuery, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ConsentGuard } from '../consent/consent.guard';
 import { ParseCuidPipe } from '../common/pipes/parse-cuid.pipe';
@@ -31,7 +37,10 @@ export class TreatmentsController {
   @Post()
   @ApiOperation({ summary: 'Create a new treatment' })
   @ApiResponse({ status: 201, description: 'Treatment created' })
-  create(@Req() req: AuthenticatedRequest, @Body() createTreatmentDto: CreateTreatmentDto) {
+  create(
+    @Req() req: AuthenticatedRequest,
+    @Body() createTreatmentDto: CreateTreatmentDto,
+  ) {
     return this.treatmentsService.create(req.user.id, createTreatmentDto);
   }
 
@@ -51,7 +60,10 @@ export class TreatmentsController {
   @Get('patient/:patientId')
   @ApiOperation({ summary: 'List treatments by patient' })
   @ApiResponse({ status: 200, description: 'List of treatments for patient' })
-  findByPatient(@Param('patientId', ParseCuidPipe) patientId: string, @Req() req: AuthenticatedRequest) {
+  findByPatient(
+    @Param('patientId', ParseCuidPipe) patientId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.treatmentsService.findByPatient(patientId, req.user.id);
   }
 
@@ -60,7 +72,10 @@ export class TreatmentsController {
   @ApiResponse({ status: 200, description: 'Treatment found' })
   @ApiResponse({ status: 400, description: 'Invalid ID format' })
   @ApiResponse({ status: 404, description: 'Treatment not found' })
-  findOne(@Param('id', ParseCuidPipe) id: string, @Req() req: AuthenticatedRequest) {
+  findOne(
+    @Param('id', ParseCuidPipe) id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.treatmentsService.findOne(id, req.user.id);
   }
 
@@ -86,7 +101,11 @@ export class TreatmentsController {
     @Req() req: AuthenticatedRequest,
     @Query('format') format: string,
   ) {
-    return this.treatmentsService.exportHistory(req.user.id, id, format || 'csv');
+    return this.treatmentsService.exportHistory(
+      req.user.id,
+      id,
+      format || 'csv',
+    );
   }
 
   @Delete(':id')
@@ -94,7 +113,10 @@ export class TreatmentsController {
   @ApiResponse({ status: 200, description: 'Treatment deleted' })
   @ApiResponse({ status: 400, description: 'Invalid ID format' })
   @ApiResponse({ status: 404, description: 'Treatment not found' })
-  remove(@Param('id', ParseCuidPipe) id: string, @Req() req: AuthenticatedRequest) {
+  remove(
+    @Param('id', ParseCuidPipe) id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.treatmentsService.remove(id, req.user.id);
   }
 }

@@ -1,4 +1,10 @@
-export const SENSITIVE_FIELDS = ['cpf', 'medicalHistory', 'address', 'phone', 'email'];
+export const SENSITIVE_FIELDS = [
+  'cpf',
+  'medicalHistory',
+  'address',
+  'phone',
+  'email',
+];
 
 // Time constants
 export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;

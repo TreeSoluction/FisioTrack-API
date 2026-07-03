@@ -13,7 +13,11 @@ export const DOCUMENT_VERSIONS = {
 export class ConsentService {
   constructor(private prisma: PrismaService) {}
 
-  async recordConsent(userId: string, dto: CreateConsentDto, ipAddress?: string) {
+  async recordConsent(
+    userId: string,
+    dto: CreateConsentDto,
+    ipAddress?: string,
+  ) {
     return this.prisma.userConsent.upsert({
       where: {
         userId_documentType: {

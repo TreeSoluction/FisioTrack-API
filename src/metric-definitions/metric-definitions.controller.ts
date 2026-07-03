@@ -9,7 +9,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ConsentGuard } from '../consent/consent.guard';
 import { ParseCuidPipe } from '../common/pipes/parse-cuid.pipe';
@@ -23,7 +28,9 @@ import { AuthenticatedRequest } from '../common/types';
 @UseGuards(JwtAuthGuard, ConsentGuard)
 @Controller('metric-definitions')
 export class MetricDefinitionsController {
-  constructor(private readonly metricDefinitionsService: MetricDefinitionsService) {}
+  constructor(
+    private readonly metricDefinitionsService: MetricDefinitionsService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List all metric definitions for the user' })
@@ -35,7 +42,10 @@ export class MetricDefinitionsController {
   @Post()
   @ApiOperation({ summary: 'Create a new metric definition' })
   @ApiResponse({ status: 201, description: 'Metric definition created' })
-  create(@Req() req: AuthenticatedRequest, @Body() dto: CreateMetricDefinitionDto) {
+  create(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateMetricDefinitionDto,
+  ) {
     return this.metricDefinitionsService.create(req.user.id, dto);
   }
 
@@ -55,7 +65,10 @@ export class MetricDefinitionsController {
   @ApiOperation({ summary: 'Delete a metric definition' })
   @ApiResponse({ status: 200, description: 'Metric definition deleted' })
   @ApiResponse({ status: 404, description: 'Not found' })
-  remove(@Req() req: AuthenticatedRequest, @Param('id', ParseCuidPipe) id: string) {
+  remove(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseCuidPipe) id: string,
+  ) {
     return this.metricDefinitionsService.remove(req.user.id, id);
   }
 }

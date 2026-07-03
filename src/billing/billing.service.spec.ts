@@ -59,9 +59,9 @@ describe('BillingService', () => {
       );
 
       prisma.subscription.findUnique.mockResolvedValue(null);
-      await expect(serviceWithoutToken.getOrCreateCustomer('user1', 'a@b.com', 'Test')).rejects.toThrow(
-        ServiceUnavailableException,
-      );
+      await expect(
+        serviceWithoutToken.getOrCreateCustomer('user1', 'a@b.com', 'Test'),
+      ).rejects.toThrow(ServiceUnavailableException);
     });
   });
 
@@ -78,7 +78,12 @@ describe('BillingService', () => {
           discountPercent: 20,
           label: 'Anual',
         },
-        onetime: { amount: 1990, currency: 'BRL', durationDays: 30, label: 'Avulso' },
+        onetime: {
+          amount: 1990,
+          currency: 'BRL',
+          durationDays: 30,
+          label: 'Avulso',
+        },
       });
     });
   });
@@ -89,7 +94,11 @@ describe('BillingService', () => {
         mpCustomerId: 'cust_existing_123',
       });
 
-      const result = await service.getOrCreateCustomer('user1', 'test@email.com', 'Test User');
+      const result = await service.getOrCreateCustomer(
+        'user1',
+        'test@email.com',
+        'Test User',
+      );
 
       expect(result).toBe('cust_existing_123');
       expect(mockFetch).not.toHaveBeenCalled();
@@ -108,7 +117,11 @@ describe('BillingService', () => {
         json: () => Promise.resolve({ id: 12345 }),
       });
 
-      const result = await service.getOrCreateCustomer('user1', 'test@email.com', 'Test User');
+      const result = await service.getOrCreateCustomer(
+        'user1',
+        'test@email.com',
+        'Test User',
+      );
 
       expect(result).toBe('12345');
       expect(prisma.subscription.upsert).toHaveBeenCalled();
@@ -122,7 +135,11 @@ describe('BillingService', () => {
         json: () => Promise.resolve({ results: [{ id: 99999 }] }),
       });
 
-      const result = await service.getOrCreateCustomer('user1', 'test@email.com', 'Test User');
+      const result = await service.getOrCreateCustomer(
+        'user1',
+        'test@email.com',
+        'Test User',
+      );
 
       expect(result).toBe('99999');
     });
@@ -136,14 +153,19 @@ describe('BillingService', () => {
       });
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          id: 'pref_789',
-          init_point: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=abc',
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 'pref_789',
+            init_point:
+              'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=abc',
+          }),
       });
 
       const result = await service.createSubscriptionCheckout(
-        'user1', 'test@email.com', 'Test User', 'monthly',
+        'user1',
+        'test@email.com',
+        'Test User',
+        'monthly',
       );
 
       expect(result.checkoutUrl).toContain('mercadopago.com.br');
@@ -157,14 +179,19 @@ describe('BillingService', () => {
       });
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          id: 'pref_789',
-          init_point: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=abc',
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 'pref_789',
+            init_point:
+              'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=abc',
+          }),
       });
 
       const result = await service.createSubscriptionCheckout(
-        'user1', 'test@email.com', 'Test User', 'yearly',
+        'user1',
+        'test@email.com',
+        'Test User',
+        'yearly',
       );
 
       expect(result.checkoutUrl).toContain('mercadopago.com.br');
@@ -178,14 +205,18 @@ describe('BillingService', () => {
       });
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          id: 'pref_xyz',
-          init_point: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=xyz',
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 'pref_xyz',
+            init_point:
+              'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=xyz',
+          }),
       });
 
       const result = await service.createOneTimeCheckout(
-        'user1', 'test@email.com', 'Test User',
+        'user1',
+        'test@email.com',
+        'Test User',
       );
 
       expect(result.preferenceId).toBe('pref_xyz');
@@ -281,7 +312,10 @@ describe('BillingService', () => {
     });
 
     it('should return false for invalid signature', () => {
-      const result = service.verifyWebhookSignature({ test: 'data' }, 'invalid');
+      const result = service.verifyWebhookSignature(
+        { test: 'data' },
+        'invalid',
+      );
       expect(result).toBe(false);
     });
 
@@ -303,14 +337,15 @@ describe('BillingService', () => {
       });
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          id: 12345,
-          status: 'approved',
-          external_reference: 'onetime_user1',
-          payment_type_id: 'credit_card',
-          transaction_amount: 19.90,
-          date_created: '2026-01-01T00:00:00.000-03:00',
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 12345,
+            status: 'approved',
+            external_reference: 'onetime_user1',
+            payment_type_id: 'credit_card',
+            transaction_amount: 19.9,
+            date_created: '2026-01-01T00:00:00.000-03:00',
+          }),
       });
 
       await service.handleWebhook({
@@ -329,13 +364,14 @@ describe('BillingService', () => {
       });
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          id: 'preapproval_123',
-          status: 'authorized',
-          metadata: { userId: 'user1' },
-          date_created: '2026-01-01T00:00:00.000-03:00',
-          next_payment_date: '2026-02-01T00:00:00.000-03:00',
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 'preapproval_123',
+            status: 'authorized',
+            metadata: { userId: 'user1' },
+            date_created: '2026-01-01T00:00:00.000-03:00',
+            next_payment_date: '2026-02-01T00:00:00.000-03:00',
+          }),
       });
 
       await service.handleWebhook({
@@ -385,20 +421,26 @@ describe('BillingService', () => {
     it('should return payment status', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          results: [{
-            status: 'approved',
-            status_detail: 'accredited',
-            id: 12345,
-            transaction_amount: 19.90,
-            payment_method_id: 'credit_card',
-            date_approved: '2026-01-01T00:00:00.000-03:00',
-            date_created: '2026-01-01T00:00:00.000-03:00',
-          }],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [
+              {
+                status: 'approved',
+                status_detail: 'accredited',
+                id: 12345,
+                transaction_amount: 19.9,
+                payment_method_id: 'credit_card',
+                date_approved: '2026-01-01T00:00:00.000-03:00',
+                date_created: '2026-01-01T00:00:00.000-03:00',
+              },
+            ],
+          }),
       });
 
-      const result = await service.checkPaymentStatus('user1', 'user1_sub_monthly');
+      const result = await service.checkPaymentStatus(
+        'user1',
+        'user1_sub_monthly',
+      );
 
       expect(result.status).toBe('approved');
       expect(result.paymentId).toBe(12345);
@@ -410,7 +452,10 @@ describe('BillingService', () => {
         json: () => Promise.resolve({ results: [] }),
       });
 
-      const result = await service.checkPaymentStatus('user1', 'user1_nonexistent');
+      const result = await service.checkPaymentStatus(
+        'user1',
+        'user1_nonexistent',
+      );
 
       expect(result.status).toBe('pending');
     });

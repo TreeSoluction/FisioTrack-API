@@ -7,7 +7,12 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
@@ -58,10 +63,7 @@ export class AuthController {
   @ApiResponse({ status: 201, description: 'User created successfully' })
   @ApiResponse({ status: 409, description: 'Email already registered' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
-  async register(
-    @Req() req: Request,
-    @Body() body: RegisterDto,
-  ) {
+  async register(@Req() req: Request, @Body() body: RegisterDto) {
     const ip = req.ip || (req.headers['x-forwarded-for'] as string);
     return this.authService.register(body.name, body.email, body.password, ip);
   }

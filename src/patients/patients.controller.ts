@@ -12,7 +12,13 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiQuery, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ConsentGuard } from '../consent/consent.guard';
 import { PatientLimitGuard } from '../common/patient-limit.guard';
@@ -34,7 +40,10 @@ export class PatientsController {
   @ApiOperation({ summary: 'Create a new patient' })
   @ApiResponse({ status: 201, description: 'Patient created successfully' })
   @ApiResponse({ status: 403, description: 'Patient limit reached' })
-  create(@Req() req: AuthenticatedRequest, @Body() createPatientDto: CreatePatientDto) {
+  create(
+    @Req() req: AuthenticatedRequest,
+    @Body() createPatientDto: CreatePatientDto,
+  ) {
     return this.patientsService.create(req.user.id, createPatientDto);
   }
 
@@ -52,18 +61,28 @@ export class PatientsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get patient by ID with treatments and appointments' })
+  @ApiOperation({
+    summary: 'Get patient by ID with treatments and appointments',
+  })
   @ApiResponse({ status: 200, description: 'Patient found' })
   @ApiResponse({ status: 400, description: 'Invalid ID format' })
   @ApiResponse({ status: 404, description: 'Patient not found' })
-  findOne(@Param('id', ParseCuidPipe) id: string, @Req() req: AuthenticatedRequest) {
+  findOne(
+    @Param('id', ParseCuidPipe) id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.patientsService.findOne(id, req.user.id);
   }
 
   @Get(':id/history')
-  @ApiOperation({ summary: 'Get patient session history with metric definitions' })
+  @ApiOperation({
+    summary: 'Get patient session history with metric definitions',
+  })
   @ApiResponse({ status: 200, description: 'Patient history' })
-  getHistory(@Param('id', ParseCuidPipe) id: string, @Req() req: AuthenticatedRequest) {
+  getHistory(
+    @Param('id', ParseCuidPipe) id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.patientsService.getHistory(req.user.id, id);
   }
 
@@ -97,7 +116,10 @@ export class PatientsController {
   @ApiResponse({ status: 200, description: 'Patient deleted' })
   @ApiResponse({ status: 400, description: 'Invalid ID format' })
   @ApiResponse({ status: 404, description: 'Patient not found' })
-  remove(@Param('id', ParseCuidPipe) id: string, @Req() req: AuthenticatedRequest) {
+  remove(
+    @Param('id', ParseCuidPipe) id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.patientsService.remove(id, req.user.id);
   }
 }

@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnModuleInit, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  ServiceUnavailableException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionStatus } from '@prisma/client';
@@ -99,11 +105,15 @@ export class BillingService implements OnModuleInit {
       } catch (error: any) {
         if (attempt === retries) throw error;
         if (error.name === 'AbortError') {
-          this.logger.warn(`Request timeout, retrying (${attempt + 1}/${retries})`);
+          this.logger.warn(
+            `Request timeout, retrying (${attempt + 1}/${retries})`,
+          );
         } else if (error.message?.includes('Payment provider error')) {
           throw error;
         } else {
-          this.logger.warn(`Request failed, retrying (${attempt + 1}/${retries})`);
+          this.logger.warn(
+            `Request failed, retrying (${attempt + 1}/${retries})`,
+          );
         }
         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
@@ -120,8 +130,10 @@ export class BillingService implements OnModuleInit {
 
     // Monthly plan
     const monthlyPlan = plans.find(
-      (p: any) => p.auto_recurring?.frequency === BILLING_PLANS.monthly.mpFrequency &&
-        p.auto_recurring?.frequency_type === BILLING_PLANS.monthly.mpFrequencyType &&
+      (p: any) =>
+        p.auto_recurring?.frequency === BILLING_PLANS.monthly.mpFrequency &&
+        p.auto_recurring?.frequency_type ===
+          BILLING_PLANS.monthly.mpFrequencyType &&
         p.auto_recurring?.transaction_amount === BILLING_PLANS.monthly.price,
     );
 
@@ -146,8 +158,10 @@ export class BillingService implements OnModuleInit {
 
     // Yearly plan
     const yearlyPlan = plans.find(
-      (p: any) => p.auto_recurring?.frequency === BILLING_PLANS.yearly.mpFrequency &&
-        p.auto_recurring?.frequency_type === BILLING_PLANS.yearly.mpFrequencyType &&
+      (p: any) =>
+        p.auto_recurring?.frequency === BILLING_PLANS.yearly.mpFrequency &&
+        p.auto_recurring?.frequency_type ===
+          BILLING_PLANS.yearly.mpFrequencyType &&
         p.auto_recurring?.transaction_amount === BILLING_PLANS.yearly.price,
     );
 
@@ -170,7 +184,9 @@ export class BillingService implements OnModuleInit {
       this.logger.log(`Yearly plan created: ${this.yearlyPlanId}`);
     }
 
-    this.logger.log(`Plans initialized - Monthly: ${this.monthlyPlanId}, Yearly: ${this.yearlyPlanId}`);
+    this.logger.log(
+      `Plans initialized - Monthly: ${this.monthlyPlanId}, Yearly: ${this.yearlyPlanId}`,
+    );
   }
 
   // ========== PRICING ==========
@@ -185,8 +201,12 @@ export class BillingService implements OnModuleInit {
       yearly: {
         amount: Math.round(BILLING_PLANS.yearly.price * 100),
         currency: 'BRL',
-        monthlyEquivalent: Math.round(BILLING_PLANS.yearly.price / 12 * 100),
-        discountPercent: Math.round((1 - BILLING_PLANS.yearly.price / (BILLING_PLANS.monthly.price * 12)) * 100),
+        monthlyEquivalent: Math.round((BILLING_PLANS.yearly.price / 12) * 100),
+        discountPercent: Math.round(
+          (1 -
+            BILLING_PLANS.yearly.price / (BILLING_PLANS.monthly.price * 12)) *
+            100,
+        ),
         label: BILLING_PLANS.yearly.label,
       },
       onetime: {
@@ -262,15 +282,21 @@ export class BillingService implements OnModuleInit {
     plan: string,
   ) {
     const customerId = await this.getOrCreateCustomer(userId, email, name);
-    const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173';
-    const apiUrl = this.config.get<string>('API_URL') || 'http://localhost:3000';
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    const apiUrl =
+      this.config.get<string>('API_URL') || 'http://localhost:3000';
 
     // Normalize plan: accept 'month'/'year' or 'monthly'/'yearly'
-    const normalizedPlan = plan === 'month' || plan === 'monthly' ? 'monthly' : 'yearly';
-    const planId = normalizedPlan === 'monthly' ? this.monthlyPlanId : this.yearlyPlanId;
+    const normalizedPlan =
+      plan === 'month' || plan === 'monthly' ? 'monthly' : 'yearly';
+    const planId =
+      normalizedPlan === 'monthly' ? this.monthlyPlanId : this.yearlyPlanId;
 
     if (!planId) {
-      throw new ServiceUnavailableException('Subscription plans not initialized');
+      throw new ServiceUnavailableException(
+        'Subscription plans not initialized',
+      );
     }
 
     const planConfig = BILLING_PLANS[normalizedPlan];
@@ -318,8 +344,10 @@ export class BillingService implements OnModuleInit {
 
   async createOneTimeCheckout(userId: string, email: string, name: string) {
     const customerId = await this.getOrCreateCustomer(userId, email, name);
-    const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173';
-    const apiUrl = this.config.get<string>('API_URL') || 'http://localhost:3000';
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    const apiUrl =
+      this.config.get<string>('API_URL') || 'http://localhost:3000';
 
     // Create preference for one-time payment
     const preference = await this.request('POST', '/checkout/preferences', {
@@ -328,7 +356,7 @@ export class BillingService implements OnModuleInit {
           id: 'fisiotrack_onetime',
           title: 'FisioTrack PRO - Acesso 30 dias',
           quantity: 1,
-          unit_price: 19.90,
+          unit_price: 19.9,
           currency_id: 'BRL',
         },
       ],
@@ -354,7 +382,9 @@ export class BillingService implements OnModuleInit {
       },
     });
 
-    this.logger.log(`One-time preference created for user ${userId}: ${preference.id}`);
+    this.logger.log(
+      `One-time preference created for user ${userId}: ${preference.id}`,
+    );
 
     return {
       preferenceId: preference.id,
@@ -370,14 +400,20 @@ export class BillingService implements OnModuleInit {
     });
 
     if (!subscription) {
-      return { plan: 'FREE', status: 'ACTIVE', currentPeriodEnd: null, cancelAtPeriodEnd: false };
+      return {
+        plan: 'FREE',
+        status: 'ACTIVE',
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+      };
     }
 
     const oneTimeAccess = await this.prisma.oneTimeAccess.findUnique({
       where: { userId },
     });
 
-    const isOneTimeExpired = oneTimeAccess && new Date() > oneTimeAccess.expiresAt;
+    const isOneTimeExpired =
+      oneTimeAccess && new Date() > oneTimeAccess.expiresAt;
 
     return {
       plan: isOneTimeExpired ? 'FREE' : subscription.plan,
@@ -407,12 +443,18 @@ export class BillingService implements OnModuleInit {
   async checkPaymentStatus(userId: string, externalReference: string) {
     // Verify the reference belongs to this user
     if (!externalReference.startsWith(userId)) {
-      return { status: 'forbidden', message: 'Reference does not belong to this user' };
+      return {
+        status: 'forbidden',
+        message: 'Reference does not belong to this user',
+      };
     }
 
     try {
       // Search for payments with this external reference
-      const payments = await this.request('GET', `/v1/payments/search?external_reference=${externalReference}`);
+      const payments = await this.request(
+        'GET',
+        `/v1/payments/search?external_reference=${externalReference}`,
+      );
 
       if (!payments.results || payments.results.length === 0) {
         return { status: 'pending', message: 'Pagamento não encontrado' };
@@ -478,11 +520,9 @@ export class BillingService implements OnModuleInit {
     }
 
     // Reactivate preapproval in Mercado Pago
-    await this.request(
-      'PUT',
-      `/preapproval/${subscription.mpPreapprovalId}`,
-      { status: 'authorized' },
-    );
+    await this.request('PUT', `/preapproval/${subscription.mpPreapprovalId}`, {
+      status: 'authorized',
+    });
 
     // Update DB
     await this.prisma.subscription.update({
@@ -500,7 +540,8 @@ export class BillingService implements OnModuleInit {
   }
 
   async createPortalUrl(userId: string) {
-    const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost';
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL') || 'http://localhost';
     // Mercado Pago doesn't have a portal like Stripe
     // Redirect to settings page where user can manage subscription
     return { url: `${frontendUrl}/settings` };
@@ -533,7 +574,9 @@ export class BillingService implements OnModuleInit {
     const resourceId = event.data?.id || event.resource;
     const eventId = `${topic}_${resourceId}`;
 
-    this.logger.log(`Webhook received: type=${topic}, resourceId=${resourceId}`);
+    this.logger.log(
+      `Webhook received: type=${topic}, resourceId=${resourceId}`,
+    );
 
     // Atomic idempotency: upsert returns existing or creates new
     const record = await this.prisma.webhookEvent.upsert({
@@ -572,7 +615,10 @@ export class BillingService implements OnModuleInit {
 
   private async handlePaymentWebhook(paymentId: string) {
     // Fetch payment details
-    const payment: MPPayment = await this.request('GET', `/v1/payments/${paymentId}`);
+    const payment: MPPayment = await this.request(
+      'GET',
+      `/v1/payments/${paymentId}`,
+    );
 
     const externalRef = payment.external_reference || '';
 
@@ -603,7 +649,9 @@ export class BillingService implements OnModuleInit {
         create: { userId, plan: 'PRO', status: 'ACTIVE' },
       });
 
-      this.logger.log(`One-time access granted for user ${userId}, expires ${expiresAt}`);
+      this.logger.log(
+        `One-time access granted for user ${userId}, expires ${expiresAt}`,
+      );
     }
 
     // Handle subscription payment
@@ -611,7 +659,8 @@ export class BillingService implements OnModuleInit {
       const parts = externalRef.split('_');
       const userId = parts[1];
       const plan = parts[2];
-      const planId = plan === 'monthly' ? this.monthlyPlanId : this.yearlyPlanId;
+      const planId =
+        plan === 'monthly' ? this.monthlyPlanId : this.yearlyPlanId;
 
       // Create preapproval for recurring payments
       let preapprovalId = null;
@@ -627,9 +676,14 @@ export class BillingService implements OnModuleInit {
             metadata: { userId, plan },
           });
           preapprovalId = preapproval.id;
-          this.logger.log(`Preapproval created for user ${userId}: ${preapprovalId}`);
+          this.logger.log(
+            `Preapproval created for user ${userId}: ${preapprovalId}`,
+          );
         } catch (error) {
-          this.logger.error(`Failed to create preapproval for user ${userId}:`, error);
+          this.logger.error(
+            `Failed to create preapproval for user ${userId}:`,
+            error,
+          );
         }
       }
 
@@ -659,7 +713,10 @@ export class BillingService implements OnModuleInit {
 
   private async handlePreapprovalWebhook(preapprovalId: string) {
     // Fetch preapproval details
-    const preapproval = await this.request('GET', `/preapproval/${preapprovalId}`);
+    const preapproval = await this.request(
+      'GET',
+      `/preapproval/${preapprovalId}`,
+    );
 
     const metadata = preapproval.metadata || {};
     const userId = metadata.userId;
@@ -673,7 +730,8 @@ export class BillingService implements OnModuleInit {
       terminated: SubscriptionStatus.CANCELLED,
     };
 
-    const newStatus = statusMap[preapproval.status] || SubscriptionStatus.ACTIVE;
+    const newStatus =
+      statusMap[preapproval.status] || SubscriptionStatus.ACTIVE;
 
     await this.prisma.subscription.upsert({
       where: { userId },
@@ -701,6 +759,8 @@ export class BillingService implements OnModuleInit {
       },
     });
 
-    this.logger.log(`Preapproval ${preapprovalId} updated for user ${userId}: ${preapproval.status}`);
+    this.logger.log(
+      `Preapproval ${preapprovalId} updated for user ${userId}: ${preapproval.status}`,
+    );
   }
 }
